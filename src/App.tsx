@@ -77,7 +77,7 @@ function App() {
         <footer className="bg-gradient-to-r from-blue-950/80 via-blue-900/70 to-blue-950/80 backdrop-blur-xl border-t border-white/10 py-8 mt-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <p className="text-blue-200/80">
-              © 2024 Texnokross. Все права защищены.
+              © 2025 Texnokross. Все права защищены.
             </p>
           </div>
         </footer>
@@ -87,4 +87,3 @@ function App() {
 }
 
 export default App;
-
