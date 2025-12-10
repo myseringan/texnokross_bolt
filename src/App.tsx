@@ -12,7 +12,8 @@ import { useProducts } from './hooks/useProducts';
 import { useCart } from './hooks/useCart';
 import type { Product } from './types';
 import { LoginPage } from './pages/LoginPage'; // Импорт LoginPage
-import { AuthProvider } from './contexts/AuthContext'; // Импорт AuthProvider (путь укажи свой, если нужно)
+import { AdminPage } from './pages/AdminPage'; // Импорт AdminPage
+import { AuthProvider } from './contexts/AuthContext'; // Импорт AuthProvider
 
 function AppContent() {
   const { products, categories, loading: productsLoading } = useProducts();
@@ -75,7 +76,8 @@ function AppContent() {
             />
           }
         />
-        <Route path="/login" element={<LoginPage />} /> {/* Добавлен маршрут /login */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin" element={<AdminPage />} /> {/* Добавлен маршрут admin */}
       </Routes>
 
       <Cart
