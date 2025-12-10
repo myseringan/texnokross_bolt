@@ -1,4 +1,4 @@
-import { ShoppingCart, Zap, Grid } from 'lucide-react';
+import { ShoppingCart, Zap, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface HeaderProps {
@@ -34,8 +34,8 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
               <div className="absolute inset-0 bg-blue-500 blur-xl opacity-0 group-hover:opacity-50 transition-opacity rounded-full"></div>
               <div className="relative backdrop-blur-xl bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2 sm:py-3 transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
                 <div className="flex items-center space-x-2">
-                  <Grid className="w-5 h-5 sm:w-6 sm:h-6 text-white" strokeWidth={2} />
-                  <span className="hidden sm:inline text-white font-medium">Категории</span>
+                  <span className="text-white font-medium">В Магазин</span>
+                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" strokeWidth={2} />
                 </div>
               </div>
             </Link>
