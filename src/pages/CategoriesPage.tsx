@@ -1,16 +1,160 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft, ShoppingCart, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
-import type { Category } from '../types';
+import type { Category, Product } from '../types';
 
 interface CategoriesPageProps {
   categories: Category[];
+  products: Product[];
+  onAddToCart: (productId: string) => void;
+  onViewDetails: (product: Product) => void;
 }
 
-export function CategoriesPage({ categories }: CategoriesPageProps) {
+export function CategoriesPage({ categories, products, onAddToCart, onViewDetails }: CategoriesPageProps) {
   const { t } = useLanguage();
   const { isDark } = useTheme();
-  
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+
+  // Фильтруем товары по выбранной категории
+  const filteredProducts = selectedCategory 
+    ? products.filter(p => p.category_id === selectedCategory.id)
+    : [];
+
+  // Если выбрана категория - показываем товары
+  if (selectedCategory) {
+    return (
+      <div className={`min-h-screen pt-14 sm:pt-20 transition-colors duration-300 ${
+        isDark 
+          ? 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900' 
+          : 'bg-gradient-to-br from-blue-100 via-white to-blue-50'
+      }`}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-12">
+          {/* Back Button & Title */}
+          <div className="mb-6 sm:mb-10">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`inline-flex items-center gap-2 backdrop-blur-xl border font-medium px-4 py-2 rounded-xl transition-all duration-200 mb-4 sm:mb-6 text-sm ${
+                isDark 
+                  ? 'bg-white/10 hover:bg-white/20 active:bg-white/30 border-white/20 text-white' 
+                  : 'bg-white hover:bg-blue-50 active:bg-blue-100 border-blue-300 text-blue-700'
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t.categoriesPage.backToCategories || "Kategoriyalarga qaytish"}
+            </button>
+            
+            <h1 className={`text-xl sm:text-4xl font-bold bg-clip-text text-transparent ${
+              isDark 
+                ? 'bg-gradient-to-r from-blue-100 via-white to-blue-100' 
+                : 'bg-gradient-to-r from-blue-700 via-blue-900 to-blue-700'
+            }`}>
+              {selectedCategory.name}
+            </h1>
+            <p className={`mt-2 text-sm sm:text-base ${isDark ? 'text-blue-200/70' : 'text-blue-600'}`}>
+              {filteredProducts.length} {t.categoriesPage.productsCount || "ta mahsulot"}
+            </p>
+          </div>
+
+          {/* Products Grid */}
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+              {filteredProducts.map(product => (
+                <div key={product.id} className="group relative">
+                  <div className={`absolute inset-0 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
+                    isDark ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10' : 'bg-gradient-to-br from-blue-400/40 to-blue-500/30'
+                  }`}></div>
+
+                  <div className={`relative backdrop-blur-xl border rounded-2xl overflow-hidden shadow-xl transition-all duration-500 sm:transform sm:hover:-translate-y-2 ${
+                    isDark 
+                      ? 'bg-white/10 border-white/20 hover:shadow-blue-500/20' 
+                      : 'bg-white border-blue-200 hover:shadow-blue-300/50 shadow-blue-100'
+                  }`}>
+                    {/* Image */}
+                    <div className={`relative h-40 sm:h-56 overflow-hidden ${
+                      isDark ? 'bg-gradient-to-br from-slate-800 to-slate-900' : 'bg-gradient-to-br from-blue-50 to-white'
+                    }`}>
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                      />
+                      
+                      {product.in_stock && (
+                        <div className="absolute top-2 right-2 backdrop-blur-xl bg-green-500/90 text-white text-[10px] sm:text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span className="hidden sm:inline">{t.productCard.inStock}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-3 sm:p-5">
+                      <h3 className={`text-sm sm:text-lg font-bold mb-1 line-clamp-2 transition-colors ${
+                        isDark 
+                          ? 'text-white group-hover:text-blue-300' 
+                          : 'text-blue-900 group-hover:text-blue-600'
+                      }`}>
+                        {product.name}
+                      </h3>
+
+                      <p className={`text-xs sm:text-sm mb-3 line-clamp-2 ${
+                        isDark ? 'text-blue-100/70' : 'text-blue-700'
+                      }`}>
+                        {product.description}
+                      </p>
+
+                      {/* Price */}
+                      <div className={`text-lg sm:text-2xl font-bold mb-3 ${
+                        isDark ? 'text-white' : 'text-blue-900'
+                      }`}>
+                        {product.price.toLocaleString('ru-RU')} сўм
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => onViewDetails(product)}
+                          className={`flex-1 border font-medium py-2 sm:py-2.5 rounded-lg transition-all duration-200 text-xs sm:text-sm ${
+                            isDark 
+                              ? 'bg-white/10 hover:bg-white/20 active:bg-white/30 border-white/30 text-white' 
+                              : 'bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border-blue-300 text-blue-700'
+                          }`}
+                        >
+                          {t.productCard.details}
+                        </button>
+
+                        <button
+                          onClick={() => onAddToCart(product.id)}
+                          disabled={!product.in_stock}
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 active:from-blue-700 active:to-blue-800 disabled:from-gray-500 disabled:to-gray-600 text-white font-medium px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-all duration-200 shadow-lg hover:shadow-blue-500/50 disabled:opacity-50"
+                        >
+                          <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`text-center py-16 backdrop-blur-xl border rounded-2xl ${
+              isDark 
+                ? 'bg-white/5 border-white/10' 
+                : 'bg-white/80 border-blue-200'
+            }`}>
+              <p className={`text-base sm:text-lg ${isDark ? 'text-blue-200/60' : 'text-blue-600'}`}>
+                {t.productGrid.noProducts}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Показываем категории
   return (
     <div className={`min-h-screen pt-14 sm:pt-20 transition-colors duration-300 ${
       isDark 
@@ -35,10 +179,10 @@ export function CategoriesPage({ categories }: CategoriesPageProps) {
         {/* Categories Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
           {categories.map(category => (
-            <Link
+            <button
               key={category.id}
-              to={`/?category=${category.id}`}
-              className="group relative"
+              onClick={() => setSelectedCategory(category)}
+              className="group relative text-left"
             >
               <div className={`absolute inset-0 rounded-xl sm:rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
                 isDark ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10' : 'bg-gradient-to-br from-blue-400/40 to-blue-500/30'
@@ -66,9 +210,9 @@ export function CategoriesPage({ categories }: CategoriesPageProps) {
                     {category.name}
                   </h2>
                   
-                  {/* Subtitle - Hidden on mobile */}
-                  <p className={`hidden sm:block text-sm mb-4 ${isDark ? 'text-blue-200/70' : 'text-blue-600'}`}>
-                    {t.categoriesPage.goToCategory}
+                  {/* Product count */}
+                  <p className={`text-xs sm:text-sm ${isDark ? 'text-blue-200/70' : 'text-blue-600'}`}>
+                    {products.filter(p => p.category_id === category.id).length} {t.categoriesPage.productsCount || "ta mahsulot"}
                   </p>
                   
                   {/* Arrow */}
@@ -82,7 +226,7 @@ export function CategoriesPage({ categories }: CategoriesPageProps) {
                   </div>
                 </div>
               </div>
-            </Link>
+            </button>
           ))}
         </div>
 
