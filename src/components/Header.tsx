@@ -1,8 +1,9 @@
-import { ShoppingCart, Zap, ArrowRight, Globe, Menu, X, Sun, Moon } from 'lucide-react';
+import { ShoppingCart, Zap, ArrowRight, Globe, Menu, X, Sun, Moon, User, LogOut } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
   cartItemCount: number;
@@ -12,6 +13,7 @@ interface HeaderProps {
 export function Header({ cartItemCount, onCartClick }: HeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
+  const { user, isAdmin, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const isHomePage = location.pathname === '/';
@@ -65,6 +67,48 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                 <Moon className="w-5 h-5 text-blue-700" strokeWidth={2} />
               )}
             </button>
+
+            {/* Auth Button */}
+            {user ? (
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    className={`relative backdrop-blur-xl border rounded-2xl px-4 py-3 transition-all duration-300 shadow-xl hover:scale-105 ${
+                      isDark 
+                        ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 border-purple-400/30' 
+                        : 'bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 border-purple-300'
+                    }`}
+                  >
+                    <span className={`font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+                      Admin
+                    </span>
+                  </Link>
+                )}
+                <button
+                  onClick={logout}
+                  className={`relative backdrop-blur-xl border rounded-2xl p-3 transition-all duration-300 shadow-xl hover:scale-105 ${
+                    isDark 
+                      ? 'bg-white/10 hover:bg-red-500/20 border-white/20' 
+                      : 'bg-blue-100/50 hover:bg-red-100 border-blue-200'
+                  }`}
+                  title="Chiqish"
+                >
+                  <LogOut className={`w-5 h-5 ${isDark ? 'text-white' : 'text-blue-700'}`} strokeWidth={2} />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className={`relative backdrop-blur-xl border rounded-2xl p-3 transition-all duration-300 shadow-xl hover:scale-105 ${
+                  isDark 
+                    ? 'bg-white/10 hover:bg-white/20 border-white/20' 
+                    : 'bg-blue-100/50 hover:bg-blue-200/50 border-blue-200'
+                }`}
+              >
+                <User className={`w-5 h-5 ${isDark ? 'text-white' : 'text-blue-700'}`} strokeWidth={2} />
+              </Link>
+            )}
 
             {/* Language Switcher */}
             <div className="relative group">
@@ -242,6 +286,50 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
               <span>Bosh sahifa</span>
               <Zap className="w-5 h-5" strokeWidth={2} />
             </Link>
+
+            {/* Auth in Mobile Menu */}
+            {user ? (
+              <>
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center justify-between w-full backdrop-blur-xl border rounded-xl px-4 py-3 font-medium ${
+                      isDark 
+                        ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 border-purple-400/30 text-purple-300 active:from-purple-500/30 active:to-blue-500/30' 
+                        : 'bg-gradient-to-r from-purple-100 to-blue-100 border-purple-300 text-purple-700 active:from-purple-200 active:to-blue-200'
+                    }`}
+                  >
+                    <span>Admin Panel</span>
+                    <User className="w-5 h-5" strokeWidth={2} />
+                  </Link>
+                )}
+                <button
+                  onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  className={`flex items-center justify-between w-full backdrop-blur-xl border rounded-xl px-4 py-3 font-medium ${
+                    isDark 
+                      ? 'bg-red-500/20 border-red-400/30 text-red-300 active:bg-red-500/30' 
+                      : 'bg-red-100 border-red-300 text-red-700 active:bg-red-200'
+                  }`}
+                >
+                  <span>Chiqish</span>
+                  <LogOut className="w-5 h-5" strokeWidth={2} />
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-between w-full backdrop-blur-xl border rounded-xl px-4 py-3 font-medium ${
+                  isDark 
+                    ? 'bg-blue-500/20 border-blue-400/30 text-blue-300 active:bg-blue-500/30' 
+                    : 'bg-blue-100 border-blue-300 text-blue-700 active:bg-blue-200'
+                }`}
+              >
+                <span>Kirish</span>
+                <User className="w-5 h-5" strokeWidth={2} />
+              </Link>
+            )}
           </div>
         )}
       </div>
