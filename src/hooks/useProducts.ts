@@ -8,12 +8,12 @@ const DELETED_PRODUCTS_KEY = 'texnokross_deleted_products';
 
 // Дефолтные категории
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat_1', name: 'Kir yuvish mashinalari', slug: 'washing-machines', created_at: new Date().toISOString() },
-  { id: 'cat_2', name: 'Muzlatgichlar', slug: 'refrigerators', created_at: new Date().toISOString() },
-  { id: 'cat_3', name: 'Konditsionerlar', slug: 'air-conditioners', created_at: new Date().toISOString() },
-  { id: 'cat_4', name: 'Televizorlar', slug: 'tvs', created_at: new Date().toISOString() },
-  { id: 'cat_5', name: 'Changyutgichlar', slug: 'vacuum-cleaners', created_at: new Date().toISOString() },
-  { id: 'cat_6', name: 'Mikroto\'lqinli pechlar', slug: 'microwaves', created_at: new Date().toISOString() },
+  { id: 'cat_1', name: 'Kir yuvish mashinalari', name_ru: 'Стиральные машины', slug: 'washing-machines', created_at: new Date().toISOString() },
+  { id: 'cat_2', name: 'Muzlatgichlar', name_ru: 'Холодильники', slug: 'refrigerators', created_at: new Date().toISOString() },
+  { id: 'cat_3', name: 'Konditsionerlar', name_ru: 'Кондиционеры', slug: 'air-conditioners', created_at: new Date().toISOString() },
+  { id: 'cat_4', name: 'Televizorlar', name_ru: 'Телевизоры', slug: 'tvs', created_at: new Date().toISOString() },
+  { id: 'cat_5', name: 'Changyutgichlar', name_ru: 'Пылесосы', slug: 'vacuum-cleaners', created_at: new Date().toISOString() },
+  { id: 'cat_6', name: 'Mikroto\'lqinli pechlar', name_ru: 'Микроволновые печи', slug: 'microwaves', created_at: new Date().toISOString() },
 ];
 
 const getLocalProducts = (): Product[] => {
@@ -28,7 +28,13 @@ const getLocalProducts = (): Product[] => {
 const getLocalCategories = (): Category[] => {
   try {
     const data = localStorage.getItem(LOCAL_CATEGORIES_KEY);
-    return data ? JSON.parse(data) : DEFAULT_CATEGORIES;
+    if (data) {
+      return JSON.parse(data);
+    } else {
+      // Сохраняем дефолтные категории при первом запуске
+      localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(DEFAULT_CATEGORIES));
+      return DEFAULT_CATEGORIES;
+    }
   } catch {
     return DEFAULT_CATEGORIES;
   }
@@ -65,6 +71,9 @@ export function useProducts() {
         ...nonLocalProducts.filter(p => !localIds.has(p.id))
       ];
     });
+
+    // Обновляем категории из localStorage
+    setCategories(getLocalCategories());
   };
 
   useEffect(() => {
