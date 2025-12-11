@@ -47,8 +47,15 @@ export function BannerManager({ isOpen, onClose, isDark }: BannerManagerProps) {
   };
 
   const handleAdd = () => {
+    setForm({
+      title: '',
+      subtitle: '',
+      image_url: '',
+      link: '',
+      type: 'sale',
+    });
+    setEditingBanner(null);
     setIsAdding(true);
-    resetForm();
   };
 
   const handleEdit = (banner: Banner) => {
