@@ -8,12 +8,16 @@ export const ru = {
     happyClients: "Довольных клиентов",
     qualityGuarantee: "Гарантия качества",
     support: "Поддержка",
+    contactUs: "Свяжитесь с нами",
   },
   
   // Header
   header: {
     subtitle: "Бытовая техника премиум класса",
     toShop: "В Магазин",
+    login: "Войти",
+    logout: "Выйти",
+    adminPanel: "Админ",
   },
   
   // Product Grid
@@ -29,6 +33,7 @@ export const ru = {
     inStock: "В наличии",
     outOfStock: "Нет в наличии",
     details: "Подробнее",
+    photos: "фото",
   },
   
   // Product Detail
@@ -57,11 +62,95 @@ export const ru = {
     goToCategory: "Перейти в категорию",
     viewProducts: "Смотреть товары",
     backToHome: "Вернуться на главную",
+    backToCategories: "Назад к категориям",
+    productsCount: "товаров",
   },
   
   // Common
   common: {
     loading: "Загрузка...",
     copyright: "© 2025 Texnokross. Все права защищены.",
+    save: "Сохранить",
+    cancel: "Отмена",
+    delete: "Удалить",
+    edit: "Редактировать",
+    add: "Добавить",
+    search: "Поиск",
+    filter: "Фильтр",
+    all: "Все",
+    yes: "Да",
+    no: "Нет",
+  },
+
+  // Auth
+  auth: {
+    backToHome: "На главную",
+    userLogin: "Вход / Регистрация",
+    userSubtitle: "По номеру телефона",
+    phone: "Номер телефона",
+    password: "Пароль",
+    passwordHint: "Если вы новый пользователь, пароль будет создан",
+    loading: "Загрузка...",
+    continueButton: "Продолжить",
+  },
+
+  // Admin Panel
+  admin: {
+    title: "Панель управления",
+    products: "Товары",
+    addProduct: "Добавить товар",
+    editProduct: "Редактировать товар",
+    deleteProduct: "Удалить товар",
+    deleteConfirm: "Вы действительно хотите удалить этот товар?",
+    
+    // Form fields
+    productName: "Название товара",
+    productDescription: "Описание",
+    productPrice: "Цена (сум)",
+    productCategory: "Категория",
+    productImages: "Изображения",
+    productInStock: "В наличии",
+    productOutOfStock: "Нет в наличии",
+    specifications: "Характеристики",
+    specName: "Название",
+    specValue: "Значение",
+    addSpec: "Добавить характеристику",
+    
+    // Images
+    images: "Изображения",
+    mainImage: "Главное",
+    addImage: "Добавить фото",
+    maxImages: "Максимум 4 фото",
+    imageHint: "Первое фото будет показано как главное",
+    imageSizeError: "Размер изображения не должен превышать 5MB",
+    maxImagesError: "Можно загрузить максимум 4 фото",
+    
+    // Categories
+    selectCategory: "Выберите категорию",
+    allCategories: "Все категории",
+    noCategory: "Без категории",
+    
+    // Messages
+    productAdded: "Товар добавлен",
+    productUpdated: "Товар обновлён",
+    productDeleted: "Товар удалён",
+    saveError: "Ошибка при сохранении",
+    fillRequired: "Пожалуйста, заполните все обязательные поля",
+    
+    // View modes
+    gridView: "Сетка",
+    listView: "Список",
+    
+    // Status
+    available: "В наличии",
+    unavailable: "Нет в наличии",
+    
+    // Search
+    searchProducts: "Поиск товаров...",
+    noProductsFound: "Товары не найдены",
+    
+    // Actions
+    logout: "Выйти",
+    saving: "Сохранение...",
   },
 };

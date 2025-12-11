@@ -8,12 +8,16 @@ export const uz = {
     happyClients: "Mamnun mijozlar",
     qualityGuarantee: "Sifat kafolati",
     support: "Qo'llab-quvvatlash",
+    contactUs: "Biz bilan bog'laning",
   },
   
   // Header
   header: {
     subtitle: "Premium darajadagi maishiy texnika",
     toShop: "Do'konga",
+    login: "Kirish",
+    logout: "Chiqish",
+    adminPanel: "Admin",
   },
   
   // Product Grid
@@ -29,6 +33,7 @@ export const uz = {
     inStock: "Mavjud",
     outOfStock: "Mavjud emas",
     details: "Batafsil",
+    photos: "ta rasm",
   },
   
   // Product Detail
@@ -57,11 +62,95 @@ export const uz = {
     goToCategory: "Toifaga o'tish",
     viewProducts: "Mahsulotlarni ko'rish",
     backToHome: "Bosh sahifaga qaytish",
+    backToCategories: "Kategoriyalarga qaytish",
+    productsCount: "ta mahsulot",
   },
   
   // Common
   common: {
     loading: "Yuklanmoqda...",
     copyright: "© 2025 Texnokross. Barcha huquqlar himoyalangan.",
+    save: "Saqlash",
+    cancel: "Bekor qilish",
+    delete: "O'chirish",
+    edit: "Tahrirlash",
+    add: "Qo'shish",
+    search: "Qidirish",
+    filter: "Filtr",
+    all: "Barchasi",
+    yes: "Ha",
+    no: "Yo'q",
+  },
+
+  // Auth
+  auth: {
+    backToHome: "Bosh sahifaga",
+    userLogin: "Kirish / Ro'yxatdan o'tish",
+    userSubtitle: "Telefon raqamingiz orqali",
+    phone: "Telefon raqam",
+    password: "Parol",
+    passwordHint: "Yangi bo'lsangiz, parol yaratiladi",
+    loading: "Yuklanmoqda...",
+    continueButton: "Davom etish",
+  },
+
+  // Admin Panel
+  admin: {
+    title: "Boshqaruv paneli",
+    products: "Mahsulotlar",
+    addProduct: "Mahsulot qo'shish",
+    editProduct: "Mahsulotni tahrirlash",
+    deleteProduct: "Mahsulotni o'chirish",
+    deleteConfirm: "Rostdan ham bu mahsulotni o'chirmoqchimisiz?",
+    
+    // Form fields
+    productName: "Mahsulot nomi",
+    productDescription: "Tavsif",
+    productPrice: "Narxi (so'm)",
+    productCategory: "Kategoriya",
+    productImages: "Rasmlar",
+    productInStock: "Mavjud",
+    productOutOfStock: "Tugagan",
+    specifications: "Xususiyatlar",
+    specName: "Nomi",
+    specValue: "Qiymati",
+    addSpec: "Xususiyat qo'shish",
+    
+    // Images
+    images: "Rasmlar",
+    mainImage: "Asosiy",
+    addImage: "Rasm qo'shish",
+    maxImages: "Maksimum 4 ta rasm",
+    imageHint: "Birinchi rasm asosiy rasm sifatida ko'rsatiladi",
+    imageSizeError: "Rasm hajmi 5MB dan oshmasligi kerak",
+    maxImagesError: "Maksimum 4 ta rasm yuklash mumkin",
+    
+    // Categories
+    selectCategory: "Kategoriyani tanlang",
+    allCategories: "Barcha kategoriyalar",
+    noCategory: "Kategoriyasiz",
+    
+    // Messages
+    productAdded: "Mahsulot qo'shildi",
+    productUpdated: "Mahsulot yangilandi",
+    productDeleted: "Mahsulot o'chirildi",
+    saveError: "Saqlashda xatolik yuz berdi",
+    fillRequired: "Iltimos, barcha majburiy maydonlarni to'ldiring",
+    
+    // View modes
+    gridView: "Katakcha ko'rinish",
+    listView: "Ro'yxat ko'rinish",
+    
+    // Status
+    available: "Mavjud",
+    unavailable: "Tugagan",
+    
+    // Search
+    searchProducts: "Mahsulotlarni qidirish...",
+    noProductsFound: "Mahsulotlar topilmadi",
+    
+    // Actions
+    logout: "Chiqish",
+    saving: "Saqlanmoqda...",
   },
 };
