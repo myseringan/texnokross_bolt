@@ -134,9 +134,9 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
   };
 
   return (
-    <div className="relative w-full mb-8 sm:mb-12">
+    <div className="relative w-full mb-6 sm:mb-12">
       {/* Main Banner */}
-      <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl ${
+      <div className={`relative overflow-hidden rounded-xl sm:rounded-3xl shadow-2xl ${
         isDark ? 'shadow-blue-500/20' : 'shadow-blue-300/30'
       }`}>
         {/* Background Image */}
@@ -151,20 +151,20 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
         {/* Gradient Overlay */}
         <div className={`absolute inset-0 bg-gradient-to-r ${getGradient(currentBanner.type)}`}></div>
 
-        {/* Content */}
-        <div className="relative z-10 px-6 py-8 sm:px-12 sm:py-16">
+        {/* Content - Fixed height for mobile */}
+        <div className="relative z-10 px-4 py-6 sm:px-12 sm:py-16 min-h-[180px] sm:min-h-[280px] flex flex-col justify-center">
           {/* Badge */}
-          <div className="inline-block px-3 py-1 sm:px-4 sm:py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs sm:text-sm font-medium mb-3 sm:mb-4">
+          <div className="inline-flex self-start px-2.5 py-1 sm:px-4 sm:py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-[10px] sm:text-sm font-medium mb-2 sm:mb-4">
             {getBadge(currentBanner.type)}
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white mb-2 sm:mb-3 drop-shadow-lg">
+          <h2 className="text-xl sm:text-4xl md:text-5xl font-bold text-white mb-1.5 sm:mb-3 drop-shadow-lg leading-tight line-clamp-2">
             {currentBanner.title}
           </h2>
 
           {/* Subtitle */}
-          <p className="text-white/90 text-sm sm:text-lg md:text-xl max-w-xl drop-shadow">
+          <p className="text-white/90 text-xs sm:text-lg md:text-xl max-w-xl drop-shadow line-clamp-2 leading-snug">
             {currentBanner.subtitle}
           </p>
 
@@ -172,42 +172,42 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
           {currentBanner.link && (
             <a
               href={currentBanner.link}
-              className="inline-block mt-4 sm:mt-6 px-6 py-2.5 sm:px-8 sm:py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
+              className="inline-block self-start mt-3 sm:mt-6 px-4 py-2 sm:px-8 sm:py-3 bg-white text-gray-900 font-semibold rounded-lg sm:rounded-xl hover:bg-gray-100 transition-all shadow-lg text-xs sm:text-base"
             >
               Batafsil →
             </a>
           )}
         </div>
 
-        {/* Navigation Arrows */}
+        {/* Navigation Arrows - smaller on mobile */}
         {banners.length > 1 && (
           <>
             <button
               onClick={goToPrev}
-              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
+              className="absolute left-1.5 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
             >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+              <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />
             </button>
             <button
               onClick={goToNext}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
+              className="absolute right-1.5 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
             >
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+              <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
             </button>
           </>
         )}
 
-        {/* Dots */}
+        {/* Dots - smaller on mobile */}
         {banners.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+          <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5 sm:gap-2">
             {banners.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-2 sm:h-2.5 rounded-full transition-all cursor-pointer ${
+                className={`h-1.5 sm:h-2.5 rounded-full transition-all cursor-pointer ${
                   index === currentIndex 
-                    ? 'bg-white w-6 sm:w-8' 
-                    : 'bg-white/50 hover:bg-white/70 w-2 sm:w-2.5'
+                    ? 'bg-white w-4 sm:w-8' 
+                    : 'bg-white/50 hover:bg-white/70 w-1.5 sm:w-2.5'
                 }`}
               />
             ))}
