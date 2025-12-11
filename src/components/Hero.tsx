@@ -1,4 +1,4 @@
-import { Sparkles, TrendingUp, Award } from 'lucide-react';
+import { Sparkles, TrendingUp, Award, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -86,11 +86,13 @@ export function Hero() {
             </div>
           </div>
 
+          {/* Shop Button */}
           <Link
             to="/categories"
-            className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 active:from-blue-700 active:to-blue-800 text-white font-semibold px-6 sm:px-12 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:scale-105 active:scale-95 text-sm sm:text-base"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 active:from-blue-700 active:to-blue-800 text-white font-semibold px-6 sm:px-10 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:scale-105 active:scale-95 text-sm sm:text-base"
           >
-            {t.hero.viewCatalog}
+            <span>{t.header.toShop}</span>
+            <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
       </div>
