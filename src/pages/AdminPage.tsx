@@ -35,6 +35,17 @@ const emptyForm: ProductForm = {
 
 // Локальное хранилище
 const LOCAL_PRODUCTS_KEY = 'texnokross_local_products';
+const LOCAL_CATEGORIES_KEY = 'texnokross_local_categories';
+
+// Дефолтные категории
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'cat_1', name: 'Kir yuvish mashinalari', slug: 'washing-machines', created_at: new Date().toISOString() },
+  { id: 'cat_2', name: 'Muzlatgichlar', slug: 'refrigerators', created_at: new Date().toISOString() },
+  { id: 'cat_3', name: 'Konditsionerlar', slug: 'air-conditioners', created_at: new Date().toISOString() },
+  { id: 'cat_4', name: 'Televizorlar', slug: 'tvs', created_at: new Date().toISOString() },
+  { id: 'cat_5', name: 'Changyutgichlar', slug: 'vacuum-cleaners', created_at: new Date().toISOString() },
+  { id: 'cat_6', name: 'Mikroto\'lqinli pechlar', slug: 'microwaves', created_at: new Date().toISOString() },
+];
 
 export function AdminPage() {
   const { isDark } = useTheme();
@@ -43,7 +54,7 @@ export function AdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -60,6 +71,21 @@ export function AdminPage() {
   
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+
+  // Закрываем dropdown при клике вне его
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('#category-dropdown') && !target.closest('[data-dropdown-trigger="category"]')) {
+        document.getElementById('category-dropdown')?.classList.add('hidden');
+      }
+      if (!target.closest('#modal-category-dropdown') && !target.closest('[data-dropdown-trigger="modal-category"]')) {
+        document.getElementById('modal-category-dropdown')?.classList.add('hidden');
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Проверяем доступ
   useEffect(() => {
@@ -86,17 +112,29 @@ export function AdminPage() {
     localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(prods));
   };
 
+  const getLocalCategories = (): Category[] => {
+    try {
+      const data = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+      return data ? JSON.parse(data) : DEFAULT_CATEGORIES;
+    } catch {
+      return DEFAULT_CATEGORIES;
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Загружаем категории из Supabase
+      // Пробуем загрузить категории из Supabase
       const { data: categoriesData } = await supabase
         .from('categories')
         .select('*')
         .order('name');
       
-      if (categoriesData) {
+      if (categoriesData && categoriesData.length > 0) {
         setCategories(categoriesData);
+      } else {
+        // Используем локальные/дефолтные категории
+        setCategories(getLocalCategories());
       }
 
       // Загружаем товары из Supabase
@@ -118,8 +156,9 @@ export function AdminPage() {
       setProducts(mergedProducts);
     } catch (err) {
       console.error('Error fetching data:', err);
-      // Если Supabase недоступен, используем только локальные
+      // Если Supabase недоступен, используем локальные данные
       setProducts(getLocalProducts());
+      setCategories(getLocalCategories());
     } finally {
       setLoading(false);
     }
@@ -231,9 +270,15 @@ export function AdminPage() {
         } else {
           localProducts.unshift(productData);
         }
+        
+        // Обновляем state сразу
+        setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData } : p));
       } else {
         // Добавляем новый
         localProducts.unshift(productData);
+        
+        // Обновляем state сразу
+        setProducts(prev => [productData, ...prev]);
       }
 
       saveLocalProducts(localProducts);
@@ -263,7 +308,6 @@ export function AdminPage() {
 
       showMessage('success', isEditing ? 'Mahsulot yangilandi' : 'Mahsulot qo\'shildi');
       closeModal();
-      fetchData();
     } catch (err) {
       showMessage('error', 'Saqlashda xatolik yuz berdi');
     } finally {
@@ -279,6 +323,9 @@ export function AdminPage() {
       const localProducts = getLocalProducts().filter(p => p.id !== productId);
       saveLocalProducts(localProducts);
 
+      // Сразу обновляем state
+      setProducts(prev => prev.filter(p => p.id !== productId));
+
       // Пробуем удалить из Supabase
       if (!productId.startsWith('local_')) {
         try {
@@ -289,7 +336,6 @@ export function AdminPage() {
       }
 
       showMessage('success', 'Mahsulot o\'chirildi');
-      fetchData();
     } catch (err) {
       showMessage('error', 'O\'chirishda xatolik');
     }
@@ -393,25 +439,67 @@ export function AdminPage() {
             />
           </div>
 
-          {/* Category Filter */}
+          {/* Category Filter - Custom Dropdown */}
           <div className="relative">
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className={`appearance-none pl-4 pr-10 py-2.5 rounded-xl border transition-all duration-200 min-w-[180px] ${
+            <button
+              data-dropdown-trigger="category"
+              onClick={() => {
+                const dropdown = document.getElementById('category-dropdown');
+                if (dropdown) dropdown.classList.toggle('hidden');
+              }}
+              className={`flex items-center justify-between gap-2 pl-4 pr-3 py-2.5 rounded-xl border transition-all duration-200 min-w-[200px] ${
                 isDark
-                  ? 'bg-white/10 border-white/20 text-white'
-                  : 'bg-white border-gray-200 text-gray-900'
+                  ? 'bg-white/10 border-white/20 text-white hover:bg-white/15'
+                  : 'bg-white border-gray-200 text-gray-900 hover:bg-gray-50'
               } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
             >
-              <option value="">Barcha kategoriyalar</option>
+              <span className="truncate">
+                {filterCategory 
+                  ? categories.find(c => c.id === filterCategory)?.name || 'Kategoriya'
+                  : 'Barcha kategoriyalar'}
+              </span>
+              <ChevronDown className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-blue-300' : 'text-gray-400'}`} />
+            </button>
+            
+            {/* Dropdown Menu */}
+            <div 
+              id="category-dropdown"
+              className={`hidden absolute top-full left-0 mt-2 w-full rounded-xl border shadow-xl z-50 overflow-hidden ${
+                isDark 
+                  ? 'bg-slate-800 border-white/20' 
+                  : 'bg-white border-gray-200'
+              }`}
+            >
+              <button
+                onClick={() => {
+                  setFilterCategory('');
+                  document.getElementById('category-dropdown')?.classList.add('hidden');
+                }}
+                className={`w-full text-left px-4 py-2.5 transition-colors ${
+                  filterCategory === ''
+                    ? isDark ? 'bg-blue-500/30 text-white' : 'bg-blue-100 text-blue-700'
+                    : isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                Barcha kategoriyalar
+              </button>
               {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setFilterCategory(cat.id);
+                    document.getElementById('category-dropdown')?.classList.add('hidden');
+                  }}
+                  className={`w-full text-left px-4 py-2.5 transition-colors ${
+                    filterCategory === cat.id
+                      ? isDark ? 'bg-blue-500/30 text-white' : 'bg-blue-100 text-blue-700'
+                      : isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  {cat.name}
+                </button>
               ))}
-            </select>
-            <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none ${
-              isDark ? 'text-blue-300' : 'text-gray-400'
-            }`} />
+            </div>
           </div>
 
           {/* View Toggle */}
@@ -745,20 +833,56 @@ export function AdminPage() {
                     <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-blue-200' : 'text-gray-700'}`}>
                       Kategoriya *
                     </label>
-                    <select
-                      value={editingProduct.category_id}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, category_id: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                        isDark
-                          ? 'bg-white/10 border-white/20 text-white'
-                          : 'bg-gray-50 border-gray-200 text-gray-900'
-                      } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-                    >
-                      <option value="">Tanlang</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        data-dropdown-trigger="modal-category"
+                        onClick={() => {
+                          const dropdown = document.getElementById('modal-category-dropdown');
+                          if (dropdown) dropdown.classList.toggle('hidden');
+                        }}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                          isDark
+                            ? 'bg-white/10 border-white/20 text-white hover:bg-white/15'
+                            : 'bg-gray-50 border-gray-200 text-gray-900 hover:bg-gray-100'
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+                      >
+                        <span className={editingProduct.category_id ? '' : isDark ? 'text-blue-300/50' : 'text-gray-400'}>
+                          {editingProduct.category_id 
+                            ? categories.find(c => c.id === editingProduct.category_id)?.name || 'Tanlang'
+                            : 'Tanlang'}
+                        </span>
+                        <ChevronDown className={`w-5 h-5 ${isDark ? 'text-blue-300' : 'text-gray-400'}`} />
+                      </button>
+                      
+                      {/* Dropdown Menu */}
+                      <div 
+                        id="modal-category-dropdown"
+                        className={`hidden absolute top-full left-0 mt-2 w-full rounded-xl border shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto ${
+                          isDark 
+                            ? 'bg-slate-800 border-white/20' 
+                            : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        {categories.map(cat => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              setEditingProduct({ ...editingProduct, category_id: cat.id });
+                              document.getElementById('modal-category-dropdown')?.classList.add('hidden');
+                            }}
+                            className={`w-full text-left px-4 py-2.5 transition-colors ${
+                              editingProduct.category_id === cat.id
+                                ? isDark ? 'bg-blue-500/30 text-white' : 'bg-blue-100 text-blue-700'
+                                : isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'
+                            }`}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
