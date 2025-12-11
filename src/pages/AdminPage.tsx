@@ -36,6 +36,10 @@ const emptyForm: ProductForm = {
 // Локальное хранилище
 const LOCAL_PRODUCTS_KEY = 'texnokross_local_products';
 const LOCAL_CATEGORIES_KEY = 'texnokross_local_categories';
+const DELETED_PRODUCTS_KEY = 'texnokross_deleted_products';
+
+// Картинка по умолчанию
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop&auto=format';
 
 // Дефолтные категории
 const DEFAULT_CATEGORIES: Category[] = [
@@ -121,6 +125,19 @@ export function AdminPage() {
     }
   };
 
+  const getDeletedIds = (): string[] => {
+    try {
+      const data = localStorage.getItem(DELETED_PRODUCTS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveDeletedIds = (ids: string[]) => {
+    localStorage.setItem(DELETED_PRODUCTS_KEY, JSON.stringify(ids));
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -145,19 +162,23 @@ export function AdminPage() {
 
       // Загружаем локальные товары
       const localProducts = getLocalProducts();
+      
+      // Загружаем список удалённых ID
+      const deletedIds = new Set(getDeletedIds());
 
-      // Объединяем: локальные имеют приоритет
+      // Объединяем: локальные имеют приоритет, фильтруем удалённые
       const localIds = new Set(localProducts.map(p => p.id));
       const mergedProducts = [
-        ...localProducts,
-        ...(supabaseProducts || []).filter(p => !localIds.has(p.id))
+        ...localProducts.filter(p => !deletedIds.has(p.id)),
+        ...(supabaseProducts || []).filter(p => !localIds.has(p.id) && !deletedIds.has(p.id))
       ];
 
       setProducts(mergedProducts);
     } catch (err) {
       console.error('Error fetching data:', err);
       // Если Supabase недоступен, используем локальные данные
-      setProducts(getLocalProducts());
+      const deletedIds = new Set(getDeletedIds());
+      setProducts(getLocalProducts().filter(p => !deletedIds.has(p.id)));
       setCategories(getLocalCategories());
     } finally {
       setLoading(false);
@@ -252,7 +273,7 @@ export function AdminPage() {
         name: editingProduct.name,
         description: editingProduct.description,
         price: parseFloat(editingProduct.price),
-        image_url: editingProduct.image_url || 'https://via.placeholder.com/400x300?text=No+Image',
+        image_url: editingProduct.image_url || DEFAULT_IMAGE,
         category_id: editingProduct.category_id,
         in_stock: editingProduct.in_stock,
         specifications: editingProduct.specifications,
@@ -319,7 +340,14 @@ export function AdminPage() {
     if (!confirm('Rostdan ham bu mahsulotni o\'chirmoqchimisiz?')) return;
 
     try {
-      // Удаляем из локального хранилища
+      // Добавляем в список удалённых ID
+      const deletedIds = getDeletedIds();
+      if (!deletedIds.includes(productId)) {
+        deletedIds.push(productId);
+        saveDeletedIds(deletedIds);
+      }
+
+      // Удаляем из локального хранилища (если есть)
       const localProducts = getLocalProducts().filter(p => p.id !== productId);
       saveLocalProducts(localProducts);
 
