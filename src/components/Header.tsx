@@ -81,7 +81,7 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                     }`}
                   >
                     <span className={`font-medium ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-                      Admin
+                      {t.header?.adminPanel || "Admin"}
                     </span>
                   </Link>
                 )}
@@ -92,7 +92,7 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                       ? 'bg-white/10 hover:bg-red-500/20 border-white/20' 
                       : 'bg-blue-100/50 hover:bg-red-100 border-blue-200'
                   }`}
-                  title="Chiqish"
+                  title={t.header?.logout || "Chiqish"}
                 >
                   <LogOut className={`w-5 h-5 ${isDark ? 'text-white' : 'text-blue-700'}`} strokeWidth={2} />
                 </button>
@@ -283,7 +283,7 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                   : 'bg-blue-100/50 border-blue-200 text-blue-700 active:bg-blue-200/50'
               }`}
             >
-              <span>Bosh sahifa</span>
+              <span>{t.auth?.backToHome || "Bosh sahifa"}</span>
               <Zap className="w-5 h-5" strokeWidth={2} />
             </Link>
 
@@ -300,7 +300,7 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                         : 'bg-gradient-to-r from-purple-100 to-blue-100 border-purple-300 text-purple-700 active:from-purple-200 active:to-blue-200'
                     }`}
                   >
-                    <span>Admin Panel</span>
+                    <span>{t.header?.adminPanel || "Admin Panel"}</span>
                     <User className="w-5 h-5" strokeWidth={2} />
                   </Link>
                 )}
@@ -312,7 +312,7 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                       : 'bg-red-100 border-red-300 text-red-700 active:bg-red-200'
                   }`}
                 >
-                  <span>Chiqish</span>
+                  <span>{t.header?.logout || "Chiqish"}</span>
                   <LogOut className="w-5 h-5" strokeWidth={2} />
                 </button>
               </>
@@ -326,7 +326,7 @@ export function Header({ cartItemCount, onCartClick }: HeaderProps) {
                     : 'bg-blue-100 border-blue-300 text-blue-700 active:bg-blue-200'
                 }`}
               >
-                <span>Kirish</span>
+                <span>{t.header?.login || "Kirish"}</span>
                 <User className="w-5 h-5" strokeWidth={2} />
               </Link>
             )}
