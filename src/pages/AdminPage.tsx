@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Save, X, LogOut, Package, 
-  Image, DollarSign, FileText, Tag, Check, AlertCircle,
-  ChevronDown, Search, Grid, List
+  Upload, DollarSign, FileText, Tag, Check, AlertCircle,
+  ChevronDown, Search, Grid, List, Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import type { Product, Category } from '../types';
 
@@ -34,11 +33,14 @@ const emptyForm: ProductForm = {
   specifications: {},
 };
 
+// Локальное хранилище
+const LOCAL_PRODUCTS_KEY = 'texnokross_local_products';
+
 export function AdminPage() {
   const { isDark } = useTheme();
-  const { t } = useLanguage();
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -57,6 +59,7 @@ export function AdminPage() {
   const [specValue, setSpecValue] = useState('');
   
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   // Проверяем доступ
   useEffect(() => {
@@ -70,18 +73,53 @@ export function AdminPage() {
     fetchData();
   }, []);
 
+  const getLocalProducts = (): Product[] => {
+    try {
+      const data = localStorage.getItem(LOCAL_PRODUCTS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveLocalProducts = (prods: Product[]) => {
+    localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(prods));
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
-        supabase.from('products').select('*').order('created_at', { ascending: false }),
-        supabase.from('categories').select('*').order('name'),
-      ]);
+      // Загружаем категории из Supabase
+      const { data: categoriesData } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (categoriesData) {
+        setCategories(categoriesData);
+      }
 
-      if (productsRes.data) setProducts(productsRes.data);
-      if (categoriesRes.data) setCategories(categoriesRes.data);
+      // Загружаем товары из Supabase
+      const { data: supabaseProducts } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Загружаем локальные товары
+      const localProducts = getLocalProducts();
+
+      // Объединяем: локальные имеют приоритет
+      const localIds = new Set(localProducts.map(p => p.id));
+      const mergedProducts = [
+        ...localProducts,
+        ...(supabaseProducts || []).filter(p => !localIds.has(p.id))
+      ];
+
+      setProducts(mergedProducts);
     } catch (err) {
-      showMessage('error', 'Ma\'lumotlarni yuklashda xatolik');
+      console.error('Error fetching data:', err);
+      // Если Supabase недоступен, используем только локальные
+      setProducts(getLocalProducts());
     } finally {
       setLoading(false);
     }
@@ -94,6 +132,7 @@ export function AdminPage() {
 
   const openAddModal = () => {
     setEditingProduct(emptyForm);
+    setImagePreview('');
     setIsEditing(false);
     setIsModalOpen(true);
   };
@@ -109,6 +148,7 @@ export function AdminPage() {
       in_stock: product.in_stock,
       specifications: product.specifications as Record<string, string> || {},
     });
+    setImagePreview(product.image_url);
     setIsEditing(true);
     setIsModalOpen(true);
   };
@@ -116,8 +156,28 @@ export function AdminPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingProduct(emptyForm);
+    setImagePreview('');
     setSpecKey('');
     setSpecValue('');
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Проверяем размер (макс 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showMessage('error', 'Rasm hajmi 5MB dan oshmasligi kerak');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setImagePreview(base64);
+        setEditingProduct({ ...editingProduct, image_url: base64 });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const addSpecification = () => {
@@ -148,7 +208,8 @@ export function AdminPage() {
 
     setSaving(true);
     try {
-      const productData = {
+      const productData: Product = {
+        id: isEditing && editingProduct.id ? editingProduct.id : `local_${Date.now()}`,
         name: editingProduct.name,
         description: editingProduct.description,
         price: parseFloat(editingProduct.price),
@@ -156,25 +217,51 @@ export function AdminPage() {
         category_id: editingProduct.category_id,
         in_stock: editingProduct.in_stock,
         specifications: editingProduct.specifications,
+        created_at: new Date().toISOString(),
       };
 
+      // Сохраняем локально
+      const localProducts = getLocalProducts();
+      
       if (isEditing && editingProduct.id) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id);
-        
-        if (error) throw error;
-        showMessage('success', 'Mahsulot yangilandi');
+        // Обновляем существующий
+        const index = localProducts.findIndex(p => p.id === editingProduct.id);
+        if (index >= 0) {
+          localProducts[index] = { ...localProducts[index], ...productData };
+        } else {
+          localProducts.unshift(productData);
+        }
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert([productData]);
-        
-        if (error) throw error;
-        showMessage('success', 'Mahsulot qo\'shildi');
+        // Добавляем новый
+        localProducts.unshift(productData);
       }
 
+      saveLocalProducts(localProducts);
+
+      // Пробуем сохранить в Supabase (без ожидания результата)
+      try {
+        if (!productData.image_url.startsWith('data:')) {
+          // Только если изображение не base64
+          if (isEditing && editingProduct.id && !editingProduct.id.startsWith('local_')) {
+            await supabase
+              .from('products')
+              .update({
+                name: productData.name,
+                description: productData.description,
+                price: productData.price,
+                image_url: productData.image_url,
+                category_id: productData.category_id,
+                in_stock: productData.in_stock,
+                specifications: productData.specifications,
+              })
+              .eq('id', editingProduct.id);
+          }
+        }
+      } catch (e) {
+        console.log('Supabase sync skipped');
+      }
+
+      showMessage('success', isEditing ? 'Mahsulot yangilandi' : 'Mahsulot qo\'shildi');
       closeModal();
       fetchData();
     } catch (err) {
@@ -188,12 +275,19 @@ export function AdminPage() {
     if (!confirm('Rostdan ham bu mahsulotni o\'chirmoqchimisiz?')) return;
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
+      // Удаляем из локального хранилища
+      const localProducts = getLocalProducts().filter(p => p.id !== productId);
+      saveLocalProducts(localProducts);
 
-      if (error) throw error;
+      // Пробуем удалить из Supabase
+      if (!productId.startsWith('local_')) {
+        try {
+          await supabase.from('products').delete().eq('id', productId);
+        } catch (e) {
+          console.log('Supabase delete skipped');
+        }
+      }
+
       showMessage('success', 'Mahsulot o\'chirildi');
       fetchData();
     } catch (err) {
@@ -213,6 +307,13 @@ export function AdminPage() {
     const matchesCategory = !filterCategory || product.category_id === filterCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Получаем название категории
+  const getCategoryName = (categoryId: string | null) => {
+    if (!categoryId) return 'Kategoriyasiz';
+    const cat = categories.find(c => c.id === categoryId);
+    return cat?.name || 'Noma\'lum';
+  };
 
   if (!isAdmin) return null;
 
@@ -236,7 +337,7 @@ export function AdminPage() {
               </div>
               <div>
                 <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Admin Panel
+                  Boshqaruv Paneli
                 </h1>
                 <p className={`text-xs ${isDark ? 'text-blue-300' : 'text-gray-500'}`}>
                   {user?.name}
@@ -297,7 +398,7 @@ export function AdminPage() {
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className={`appearance-none pl-4 pr-10 py-2.5 rounded-xl border transition-all duration-200 ${
+              className={`appearance-none pl-4 pr-10 py-2.5 rounded-xl border transition-all duration-200 min-w-[180px] ${
                 isDark
                   ? 'bg-white/10 border-white/20 text-white'
                   : 'bg-white border-gray-200 text-gray-900'
@@ -380,6 +481,11 @@ export function AdminPage() {
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
+                  <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-xs font-medium ${
+                    isDark ? 'bg-black/50 text-white' : 'bg-white/90 text-gray-700'
+                  }`}>
+                    {getCategoryName(product.category_id)}
+                  </div>
                   <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
                     product.in_stock 
                       ? 'bg-green-500/90 text-white' 
@@ -445,7 +551,10 @@ export function AdminPage() {
                   <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     {product.name}
                   </h3>
-                  <p className={`text-sm ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
+                  <p className={`text-sm ${isDark ? 'text-blue-200/70' : 'text-gray-500'}`}>
+                    {getCategoryName(product.category_id)}
+                  </p>
+                  <p className={`text-sm font-medium ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
                     {product.price.toLocaleString()} сўм
                   </p>
                 </div>
@@ -517,6 +626,51 @@ export function AdminPage() {
 
               {/* Modal Body */}
               <div className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto space-y-4">
+                {/* Image Upload */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-blue-200' : 'text-gray-700'}`}>
+                    Rasm
+                  </label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative cursor-pointer border-2 border-dashed rounded-xl p-4 transition-all hover:border-blue-500 ${
+                      isDark 
+                        ? 'border-white/20 hover:bg-white/5' 
+                        : 'border-gray-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    {imagePreview ? (
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <div className={`absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity rounded-lg`}>
+                          <p className="text-white text-sm">Boshqa rasm tanlash</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center py-8">
+                        <Upload className={`w-12 h-12 mb-2 ${isDark ? 'text-blue-300' : 'text-gray-400'}`} />
+                        <p className={`text-sm ${isDark ? 'text-blue-200' : 'text-gray-600'}`}>
+                          Rasm yuklash uchun bosing
+                        </p>
+                        <p className={`text-xs mt-1 ${isDark ? 'text-blue-300/60' : 'text-gray-400'}`}>
+                          PNG, JPG, WEBP (max 5MB)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Name */}
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-blue-200' : 'text-gray-700'}`}>
@@ -606,37 +760,6 @@ export function AdminPage() {
                       ))}
                     </select>
                   </div>
-                </div>
-
-                {/* Image URL */}
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-blue-200' : 'text-gray-700'}`}>
-                    Rasm URL
-                  </label>
-                  <div className="relative">
-                    <Image className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
-                      isDark ? 'text-blue-300' : 'text-gray-400'
-                    }`} />
-                    <input
-                      type="url"
-                      value={editingProduct.image_url}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
-                      placeholder="https://..."
-                      className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-all ${
-                        isDark
-                          ? 'bg-white/10 border-white/20 text-white placeholder-blue-300/50'
-                          : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
-                      } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-                    />
-                  </div>
-                  {editingProduct.image_url && (
-                    <img
-                      src={editingProduct.image_url}
-                      alt="Preview"
-                      className="mt-2 h-32 rounded-lg object-cover"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                  )}
                 </div>
 
                 {/* In Stock */}
