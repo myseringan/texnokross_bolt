@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface Banner {
@@ -72,6 +72,10 @@ interface BannerSliderProps {
 export function BannerSlider({ isDark }: BannerSliderProps) {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Для свайпа
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   useEffect(() => {
     const allBanners = loadBanners();
@@ -100,6 +104,30 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
 
   const goToNext = () => {
     setCurrentIndex(prev => (prev + 1) % banners.length);
+  };
+
+  // Touch handlers для свайпа
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const diff = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50; // минимальное расстояние для свайпа
+
+    if (Math.abs(diff) > minSwipeDistance) {
+      if (diff > 0) {
+        // Свайп влево - следующий
+        goToNext();
+      } else {
+        // Свайп вправо - предыдущий
+        goToPrev();
+      }
+    }
   };
 
   // Цвета по типу баннера
@@ -136,9 +164,14 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
   return (
     <div className="relative w-full mb-6 sm:mb-12">
       {/* Main Banner */}
-      <div className={`relative overflow-hidden rounded-xl sm:rounded-3xl shadow-2xl ${
-        isDark ? 'shadow-blue-500/20' : 'shadow-blue-300/30'
-      }`}>
+      <div 
+        className={`relative overflow-hidden rounded-xl sm:rounded-3xl shadow-2xl ${
+          isDark ? 'shadow-blue-500/20' : 'shadow-blue-300/30'
+        }`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Background Image */}
         <div className="absolute inset-0">
           <img 
@@ -179,20 +212,20 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
           )}
         </div>
 
-        {/* Navigation Arrows - smaller on mobile */}
+        {/* Navigation Arrows - Hidden on mobile, use swipe instead */}
         {banners.length > 1 && (
           <>
             <button
               onClick={goToPrev}
-              className="absolute left-1.5 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
+              className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full items-center justify-center text-white transition-all cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />
+              <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={goToNext}
-              className="absolute right-1.5 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
+              className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full items-center justify-center text-white transition-all cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
+              <ChevronRight className="w-6 h-6" />
             </button>
           </>
         )}
