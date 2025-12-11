@@ -184,13 +184,13 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
           <>
             <button
               onClick={goToPrev}
-              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
             >
               <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             <button
               onClick={goToNext}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/40 active:bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
             >
               <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
@@ -199,15 +199,15 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
 
         {/* Dots */}
         {banners.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
             {banners.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all ${
+                className={`h-2 sm:h-2.5 rounded-full transition-all cursor-pointer ${
                   index === currentIndex 
                     ? 'bg-white w-6 sm:w-8' 
-                    : 'bg-white/50 hover:bg-white/70'
+                    : 'bg-white/50 hover:bg-white/70 w-2 sm:w-2.5'
                 }`}
               />
             ))}
