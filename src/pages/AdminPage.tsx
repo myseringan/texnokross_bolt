@@ -17,17 +17,19 @@ interface ProductForm {
   name: string;
   description: string;
   price: string;
-  image_url: string;
+  images: string[]; // Массив фото (до 4 штук)
   category_id: string;
   in_stock: boolean;
   specifications: Record<string, string>;
 }
 
+const MAX_IMAGES = 4;
+
 const emptyForm: ProductForm = {
   name: '',
   description: '',
   price: '',
-  image_url: '',
+  images: [],
   category_id: '',
   in_stock: true,
   specifications: {},
@@ -74,7 +76,6 @@ export function AdminPage() {
   const [specValue, setSpecValue] = useState('');
   
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
 
   // Закрываем dropdown при клике вне его
   useEffect(() => {
@@ -192,23 +193,24 @@ export function AdminPage() {
 
   const openAddModal = () => {
     setEditingProduct(emptyForm);
-    setImagePreview('');
     setIsEditing(false);
     setIsModalOpen(true);
   };
 
   const openEditModal = (product: Product) => {
+    // Получаем массив изображений из product
+    const images = product.images || (product.image_url ? [product.image_url] : []);
+    
     setEditingProduct({
       id: product.id,
       name: product.name,
       description: product.description,
       price: product.price.toString(),
-      image_url: product.image_url,
+      images: images,
       category_id: product.category_id || '',
       in_stock: product.in_stock,
       specifications: product.specifications as Record<string, string> || {},
     });
-    setImagePreview(product.image_url);
     setIsEditing(true);
     setIsModalOpen(true);
   };
@@ -216,28 +218,49 @@ export function AdminPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingProduct(emptyForm);
-    setImagePreview('');
     setSpecKey('');
     setSpecValue('');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Проверяем размер (макс 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        showMessage('error', 'Rasm hajmi 5MB dan oshmasligi kerak');
-        return;
-      }
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setImagePreview(base64);
-        setEditingProduct({ ...editingProduct, image_url: base64 });
-      };
-      reader.readAsDataURL(file);
+    // Проверяем лимит
+    if (editingProduct.images.length >= MAX_IMAGES) {
+      showMessage('error', `Maksimum ${MAX_IMAGES} ta rasm yuklash mumkin`);
+      return;
     }
+
+    const file = files[0];
+    
+    // Проверяем размер (макс 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showMessage('error', 'Rasm hajmi 5MB dan oshmasligi kerak');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setEditingProduct(prev => ({
+        ...prev,
+        images: [...prev.images, base64]
+      }));
+    };
+    reader.readAsDataURL(file);
+    
+    // Сбрасываем input для повторной загрузки того же файла
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setEditingProduct(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
   };
 
   const addSpecification = () => {
@@ -268,12 +291,17 @@ export function AdminPage() {
 
     setSaving(true);
     try {
+      // Определяем изображения
+      const images = editingProduct.images.length > 0 ? editingProduct.images : [DEFAULT_IMAGE];
+      const mainImage = images[0];
+
       const productData: Product = {
         id: isEditing && editingProduct.id ? editingProduct.id : `local_${Date.now()}`,
         name: editingProduct.name,
         description: editingProduct.description,
         price: parseFloat(editingProduct.price),
-        image_url: editingProduct.image_url || DEFAULT_IMAGE,
+        image_url: mainImage, // Главное фото для обратной совместимости
+        images: images, // Массив всех фото
         category_id: editingProduct.category_id,
         in_stock: editingProduct.in_stock,
         specifications: editingProduct.specifications,
@@ -306,7 +334,7 @@ export function AdminPage() {
 
       // Пробуем сохранить в Supabase (без ожидания результата)
       try {
-        if (!productData.image_url.startsWith('data:')) {
+        if (!mainImage.startsWith('data:')) {
           // Только если изображение не base64
           if (isEditing && editingProduct.id && !editingProduct.id.startsWith('local_')) {
             await supabase
@@ -593,7 +621,7 @@ export function AdminPage() {
               >
                 <div className="relative h-40">
                   <img
-                    src={product.image_url}
+                    src={product.images?.[0] || product.image_url}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
@@ -602,6 +630,15 @@ export function AdminPage() {
                   }`}>
                     {getCategoryName(product.category_id)}
                   </div>
+                  {/* Image count */}
+                  {product.images && product.images.length > 1 && (
+                    <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
+                      isDark ? 'bg-black/50 text-white' : 'bg-white/90 text-gray-700'
+                    }`}>
+                      <ImageIcon className="w-3 h-3" />
+                      {product.images.length}
+                    </div>
+                  )}
                   <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
                     product.in_stock 
                       ? 'bg-green-500/90 text-white' 
@@ -658,11 +695,20 @@ export function AdminPage() {
                     : 'bg-white border-blue-200'
                 }`}
               >
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                />
+                <div className="relative">
+                  <img
+                    src={product.images?.[0] || product.image_url}
+                    alt={product.name}
+                    className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                  />
+                  {product.images && product.images.length > 1 && (
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      isDark ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
+                    }`}>
+                      {product.images.length}
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     {product.name}
@@ -742,10 +788,10 @@ export function AdminPage() {
 
               {/* Modal Body */}
               <div className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto space-y-4">
-                {/* Image Upload */}
+                {/* Image Upload - Multiple */}
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-blue-200' : 'text-gray-700'}`}>
-                    Rasm
+                    Rasmlar ({editingProduct.images.length}/{MAX_IMAGES})
                   </label>
                   <input
                     type="file"
@@ -754,37 +800,55 @@ export function AdminPage() {
                     accept="image/*"
                     className="hidden"
                   />
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`relative cursor-pointer border-2 border-dashed rounded-xl p-4 transition-all hover:border-blue-500 ${
-                      isDark 
-                        ? 'border-white/20 hover:bg-white/5' 
-                        : 'border-gray-300 hover:bg-blue-50'
-                    }`}
-                  >
-                    {imagePreview ? (
-                      <div className="relative">
+                  
+                  {/* Images Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                    {/* Existing Images */}
+                    {editingProduct.images.map((img, index) => (
+                      <div key={index} className="relative group aspect-square">
                         <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-48 object-cover rounded-lg"
+                          src={img}
+                          alt={`Photo ${index + 1}`}
+                          className="w-full h-full object-cover rounded-xl"
                         />
-                        <div className={`absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity rounded-lg`}>
-                          <p className="text-white text-sm">Boshqa rasm tanlash</p>
-                        </div>
+                        {index === 0 && (
+                          <div className={`absolute top-1 left-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            isDark ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
+                          }`}>
+                            Asosiy
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center py-8">
-                        <Upload className={`w-12 h-12 mb-2 ${isDark ? 'text-blue-300' : 'text-gray-400'}`} />
-                        <p className={`text-sm ${isDark ? 'text-blue-200' : 'text-gray-600'}`}>
-                          Rasm yuklash uchun bosing
-                        </p>
-                        <p className={`text-xs mt-1 ${isDark ? 'text-blue-300/60' : 'text-gray-400'}`}>
-                          PNG, JPG, WEBP (max 5MB)
+                    ))}
+                    
+                    {/* Add More Button */}
+                    {editingProduct.images.length < MAX_IMAGES && (
+                      <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`aspect-square cursor-pointer border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all hover:border-blue-500 ${
+                          isDark 
+                            ? 'border-white/20 hover:bg-white/5' 
+                            : 'border-gray-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        <Plus className={`w-8 h-8 mb-1 ${isDark ? 'text-blue-300' : 'text-gray-400'}`} />
+                        <p className={`text-xs text-center ${isDark ? 'text-blue-200' : 'text-gray-500'}`}>
+                          Rasm qo'shish
                         </p>
                       </div>
                     )}
                   </div>
+                  
+                  <p className={`text-xs ${isDark ? 'text-blue-300/60' : 'text-gray-400'}`}>
+                    Birinchi rasm asosiy rasm sifatida ko'rsatiladi. Maksimum {MAX_IMAGES} ta rasm.
+                  </p>
                 </div>
 
                 {/* Name */}
