@@ -57,20 +57,9 @@ export function useProducts() {
   const loadProducts = () => {
     const localProducts = getLocalProducts();
     const deletedIds = new Set(getDeletedIds());
+    const filteredLocal = localProducts.filter(p => !deletedIds.has(p.id));
     
-    setProducts(prev => {
-      // Фильтруем локальные товары
-      const filteredLocal = localProducts.filter(p => !deletedIds.has(p.id));
-      // Фильтруем остальные товары (из Supabase)
-      const nonLocalProducts = prev.filter(p => !p.id.startsWith('local_') && !deletedIds.has(p.id));
-      
-      // Объединяем
-      const localIds = new Set(filteredLocal.map(p => p.id));
-      return [
-        ...filteredLocal,
-        ...nonLocalProducts.filter(p => !localIds.has(p.id))
-      ];
-    });
+    setProducts(filteredLocal);
 
     // Обновляем категории из localStorage
     setCategories(getLocalCategories());
@@ -79,36 +68,54 @@ export function useProducts() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [productsResult, categoriesResult] = await Promise.all([
-          supabase.from('products').select('*').order('created_at', { ascending: false }),
-          supabase.from('categories').select('*').order('name')
-        ]);
-
-        // Категории
-        if (categoriesResult.data && categoriesResult.data.length > 0) {
-          setCategories(categoriesResult.data as Category[]);
-        } else {
-          setCategories(getLocalCategories());
-        }
-
-        // Загружаем локальные товары и удалённые ID
+        // Сначала загружаем локальные данные
         const localProducts = getLocalProducts();
+        const localCategories = getLocalCategories();
         const deletedIds = new Set(getDeletedIds());
 
-        // Объединяем: локальные имеют приоритет, фильтруем удалённые
-        const supabaseProducts = productsResult.data || [];
-        const localIds = new Set(localProducts.map(p => p.id));
-        const mergedProducts = [
-          ...localProducts.filter(p => !deletedIds.has(p.id)),
-          ...supabaseProducts.filter(p => !localIds.has(p.id) && !deletedIds.has(p.id))
-        ];
+        // Фильтруем удалённые
+        const filteredLocalProducts = localProducts.filter(p => !deletedIds.has(p.id));
+        
+        // Устанавливаем локальные данные
+        setProducts(filteredLocalProducts);
+        setCategories(localCategories);
 
-        setProducts(mergedProducts as Product[]);
+        // Пробуем загрузить из Supabase (не блокируем если не работает)
+        try {
+          const [productsResult, categoriesResult] = await Promise.all([
+            supabase.from('products').select('*').order('created_at', { ascending: false }),
+            supabase.from('categories').select('*').order('name')
+          ]);
+
+          // Если есть данные из Supabase - добавляем их
+          if (categoriesResult.data && categoriesResult.data.length > 0) {
+            // Объединяем с локальными, локальные имеют приоритет
+            const supabaseCategories = categoriesResult.data as Category[];
+            const localCatIds = new Set(localCategories.map(c => c.id));
+            const mergedCategories = [
+              ...localCategories,
+              ...supabaseCategories.filter(c => !localCatIds.has(c.id))
+            ];
+            setCategories(mergedCategories);
+          }
+
+          if (productsResult.data && productsResult.data.length > 0) {
+            const supabaseProducts = productsResult.data as Product[];
+            const localProdIds = new Set(filteredLocalProducts.map(p => p.id));
+            const mergedProducts = [
+              ...filteredLocalProducts,
+              ...supabaseProducts.filter(p => !localProdIds.has(p.id) && !deletedIds.has(p.id))
+            ];
+            setProducts(mergedProducts);
+          }
+        } catch (supabaseErr) {
+          // Supabase недоступен - используем только локальные данные
+          console.log('Supabase unavailable, using local data');
+        }
       } catch (err) {
-        // Если Supabase недоступен, используем только локальные
-        const deletedIds = new Set(getDeletedIds());
-        setProducts(getLocalProducts().filter(p => !deletedIds.has(p.id)));
-        setCategories(getLocalCategories());
+        // Критическая ошибка - используем дефолтные
+        setProducts([]);
+        setCategories(DEFAULT_CATEGORIES);
       } finally {
         setLoading(false);
       }
