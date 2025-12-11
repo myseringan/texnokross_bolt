@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Save, X, LogOut, Package, 
   Upload, DollarSign, FileText, Tag, Check, AlertCircle,
-  ChevronDown, Search, Grid, List, Image as ImageIcon, FileSpreadsheet, Megaphone
+  ChevronDown, Search, Grid, List, Image as ImageIcon, FileSpreadsheet, Megaphone, FolderOpen
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -11,6 +11,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { ExcelImport } from '../components/ExcelImport';
 import { BannerManager } from '../components/BannerManager';
+import { CategoryManager } from '../components/CategoryManager';
 import type { Product, Category } from '../types';
 
 type ViewMode = 'grid' | 'list';
@@ -88,6 +89,7 @@ export function AdminPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isBannerManagerOpen, setIsBannerManagerOpen] = useState(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
   // Закрываем dropdown при клике вне его
   useEffect(() => {
@@ -599,6 +601,19 @@ export function AdminPage() {
               <List className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Category Manager Button */}
+          <button
+            onClick={() => setIsCategoryManagerOpen(true)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+              isDark 
+                ? 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30' 
+                : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300'
+            }`}
+          >
+            <FolderOpen className="w-5 h-5" />
+            <span className="hidden sm:inline">Kategoriya</span>
+          </button>
 
           {/* Banner Manager Button */}
           <button
@@ -1195,6 +1210,15 @@ export function AdminPage() {
         isOpen={isBannerManagerOpen}
         onClose={() => setIsBannerManagerOpen(false)}
         isDark={isDark}
+      />
+
+      {/* Category Manager Modal */}
+      <CategoryManager
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        isDark={isDark}
+        categories={categories}
+        onCategoriesChange={setCategories}
       />
     </div>
   );
