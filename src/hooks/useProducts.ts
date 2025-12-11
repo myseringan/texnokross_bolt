@@ -4,6 +4,7 @@ import type { Product, Category } from '../types';
 
 const LOCAL_PRODUCTS_KEY = 'texnokross_local_products';
 const LOCAL_CATEGORIES_KEY = 'texnokross_local_categories';
+const DELETED_PRODUCTS_KEY = 'texnokross_deleted_products';
 
 // Дефолтные категории
 const DEFAULT_CATEGORIES: Category[] = [
@@ -33,10 +34,38 @@ const getLocalCategories = (): Category[] => {
   }
 };
 
+const getDeletedIds = (): string[] => {
+  try {
+    const data = localStorage.getItem(DELETED_PRODUCTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
+
+  const loadProducts = () => {
+    const localProducts = getLocalProducts();
+    const deletedIds = new Set(getDeletedIds());
+    
+    setProducts(prev => {
+      // Фильтруем локальные товары
+      const filteredLocal = localProducts.filter(p => !deletedIds.has(p.id));
+      // Фильтруем остальные товары (из Supabase)
+      const nonLocalProducts = prev.filter(p => !p.id.startsWith('local_') && !deletedIds.has(p.id));
+      
+      // Объединяем
+      const localIds = new Set(filteredLocal.map(p => p.id));
+      return [
+        ...filteredLocal,
+        ...nonLocalProducts.filter(p => !localIds.has(p.id))
+      ];
+    });
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -53,21 +82,23 @@ export function useProducts() {
           setCategories(getLocalCategories());
         }
 
-        // Загружаем локальные товары
+        // Загружаем локальные товары и удалённые ID
         const localProducts = getLocalProducts();
+        const deletedIds = new Set(getDeletedIds());
 
-        // Объединяем: локальные имеют приоритет
+        // Объединяем: локальные имеют приоритет, фильтруем удалённые
         const supabaseProducts = productsResult.data || [];
         const localIds = new Set(localProducts.map(p => p.id));
         const mergedProducts = [
-          ...localProducts,
-          ...supabaseProducts.filter(p => !localIds.has(p.id))
+          ...localProducts.filter(p => !deletedIds.has(p.id)),
+          ...supabaseProducts.filter(p => !localIds.has(p.id) && !deletedIds.has(p.id))
         ];
 
         setProducts(mergedProducts as Product[]);
       } catch (err) {
         // Если Supabase недоступен, используем только локальные
-        setProducts(getLocalProducts());
+        const deletedIds = new Set(getDeletedIds());
+        setProducts(getLocalProducts().filter(p => !deletedIds.has(p.id)));
         setCategories(getLocalCategories());
       } finally {
         setLoading(false);
@@ -78,32 +109,13 @@ export function useProducts() {
 
     // Слушаем изменения в localStorage
     const handleStorageChange = () => {
-      const localProducts = getLocalProducts();
-      setProducts(prev => {
-        const localIds = new Set(localProducts.map(p => p.id));
-        const nonLocalProducts = prev.filter(p => !p.id.startsWith('local_') && !localIds.has(p.id));
-        return [...localProducts, ...nonLocalProducts];
-      });
+      loadProducts();
     };
 
     window.addEventListener('storage', handleStorageChange);
     
-    // Также проверяем каждые 2 секунды локальное хранилище (для синхронизации в том же окне)
-    const interval = setInterval(() => {
-      const localProducts = getLocalProducts();
-      setProducts(prev => {
-        const prevIds = new Set(prev.map(p => p.id));
-        const localIds = new Set(localProducts.map(p => p.id));
-        
-        // Если изменилось количество локальных товаров
-        const prevLocalCount = prev.filter(p => p.id.startsWith('local_')).length;
-        if (prevLocalCount !== localProducts.length) {
-          const nonLocalProducts = prev.filter(p => !p.id.startsWith('local_'));
-          return [...localProducts, ...nonLocalProducts];
-        }
-        return prev;
-      });
-    }, 2000);
+    // Проверяем каждые 2 секунды для синхронизации
+    const interval = setInterval(loadProducts, 2000);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
