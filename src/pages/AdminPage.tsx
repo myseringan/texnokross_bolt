@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Save, X, LogOut, Package, 
   Upload, DollarSign, FileText, Tag, Check, AlertCircle,
-  ChevronDown, Search, Grid, List, Image as ImageIcon
+  ChevronDown, Search, Grid, List, Image as ImageIcon, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
+import { ExcelImport } from '../components/ExcelImport';
 import type { Product, Category } from '../types';
 
 type ViewMode = 'grid' | 'list';
@@ -78,6 +79,7 @@ export function AdminPage() {
   const [specValue, setSpecValue] = useState('');
   
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Закрываем dropdown при клике вне его
   useEffect(() => {
@@ -584,6 +586,19 @@ export function AdminPage() {
             </button>
           </div>
 
+          {/* Import Button */}
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+              isDark 
+                ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30' 
+                : 'bg-green-100 hover:bg-green-200 text-green-700 border border-green-300'
+            }`}
+          >
+            <FileSpreadsheet className="w-5 h-5" />
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+
           {/* Add Button */}
           <button
             onClick={openAddModal}
@@ -1088,6 +1103,19 @@ export function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImport
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImport={(importedProducts) => {
+          setProducts(importedProducts);
+          showMessage('success', `${importedProducts.length} ta mahsulot import qilindi`);
+        }}
+        categories={categories}
+        isDark={isDark}
+        existingProducts={products}
+      />
     </div>
   );
 }
