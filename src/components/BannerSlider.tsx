@@ -207,15 +207,16 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
 
         {/* Dots indicator */}
         {banners.length > 1 && (
-          <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5 sm:gap-2">
+          <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2">
             {banners.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-[5px] sm:h-3 rounded-full transition-all cursor-pointer ${
+                style={{ height: '6px' }}
+                className={`rounded-full transition-all cursor-pointer sm:h-3 ${
                   index === currentIndex 
                     ? 'bg-white w-4 sm:w-8' 
-                    : 'bg-white/50 hover:bg-white/70 w-[5px] sm:w-3'
+                    : 'bg-white/50 hover:bg-white/70 w-1.5 sm:w-3'
                 }`}
               />
             ))}
