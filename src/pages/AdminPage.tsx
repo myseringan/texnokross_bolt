@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { supabase } from '../lib/supabase';
+import * as api from '../lib/api';
 import { BannerManager } from '../components/BannerManager';
 import { CategoryManager } from '../components/CategoryManager';
 import type { Product, Category } from '../types';
@@ -43,11 +43,6 @@ const emptyForm: ProductForm = {
   specifications: {},
   specifications_ru: {},
 };
-
-// Локальное хранилище
-const LOCAL_PRODUCTS_KEY = 'texnokross_local_products';
-const LOCAL_CATEGORIES_KEY = 'texnokross_local_categories';
-const DELETED_PRODUCTS_KEY = 'texnokross_deleted_products';
 
 // Картинка по умолчанию
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop&auto=format';
@@ -116,83 +111,19 @@ export function AdminPage() {
     fetchData();
   }, []);
 
-  const getLocalProducts = (): Product[] => {
-    try {
-      const data = localStorage.getItem(LOCAL_PRODUCTS_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveLocalProducts = (prods: Product[]) => {
-    localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(prods));
-  };
-
-  const getLocalCategories = (): Category[] => {
-    try {
-      const data = localStorage.getItem(LOCAL_CATEGORIES_KEY);
-      return data ? JSON.parse(data) : DEFAULT_CATEGORIES;
-    } catch {
-      return DEFAULT_CATEGORIES;
-    }
-  };
-
-  const getDeletedIds = (): string[] => {
-    try {
-      const data = localStorage.getItem(DELETED_PRODUCTS_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveDeletedIds = (ids: string[]) => {
-    localStorage.setItem(DELETED_PRODUCTS_KEY, JSON.stringify(ids));
-  };
-
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Пробуем загрузить категории из Supabase
-      const { data: categoriesData } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
+      const [productsData, categoriesData] = await Promise.all([
+        api.getProducts(),
+        api.getCategories(),
+      ]);
       
-      if (categoriesData && categoriesData.length > 0) {
-        setCategories(categoriesData);
-      } else {
-        // Используем локальные/дефолтные категории
-        setCategories(getLocalCategories());
-      }
-
-      // Загружаем товары из Supabase
-      const { data: supabaseProducts } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // Загружаем локальные товары
-      const localProducts = getLocalProducts();
-      
-      // Загружаем список удалённых ID
-      const deletedIds = new Set(getDeletedIds());
-
-      // Объединяем: локальные имеют приоритет, фильтруем удалённые
-      const localIds = new Set(localProducts.map(p => p.id));
-      const mergedProducts = [
-        ...localProducts.filter(p => !deletedIds.has(p.id)),
-        ...(supabaseProducts || []).filter(p => !localIds.has(p.id) && !deletedIds.has(p.id))
-      ];
-
-      setProducts(mergedProducts);
+      setProducts(productsData || []);
+      setCategories(categoriesData?.length > 0 ? categoriesData : DEFAULT_CATEGORIES);
     } catch (err) {
       console.error('Error fetching data:', err);
-      // Если Supabase недоступен, используем локальные данные
-      const deletedIds = new Set(getDeletedIds());
-      setProducts(getLocalProducts().filter(p => !deletedIds.has(p.id)));
-      setCategories(getLocalCategories());
+      setCategories(DEFAULT_CATEGORIES);
     } finally {
       setLoading(false);
     }
@@ -310,15 +241,15 @@ export function AdminPage() {
       const images = editingProduct.images.length > 0 ? editingProduct.images : [DEFAULT_IMAGE];
       const mainImage = images[0];
 
-      const productData: Product = {
-        id: isEditing && editingProduct.id ? editingProduct.id : `local_${Date.now()}`,
+      const productData = {
+        id: isEditing && editingProduct.id ? editingProduct.id : `prod_${Date.now()}`,
         name: editingProduct.name,
-        name_ru: editingProduct.name_ru || editingProduct.name, // Если нет русского - берём узбекский
+        name_ru: editingProduct.name_ru || editingProduct.name,
         description: editingProduct.description,
         description_ru: editingProduct.description_ru || editingProduct.description,
         price: parseFloat(editingProduct.price),
-        image_url: mainImage, // Главное фото для обратной совместимости
-        images: images, // Массив всех фото
+        image_url: mainImage,
+        images: images,
         category_id: editingProduct.category_id,
         in_stock: editingProduct.in_stock,
         specifications: editingProduct.specifications,
@@ -326,56 +257,24 @@ export function AdminPage() {
         created_at: new Date().toISOString(),
       };
 
-      // Сохраняем локально
-      const localProducts = getLocalProducts();
-      
       if (isEditing && editingProduct.id) {
-        // Обновляем существующий
-        const index = localProducts.findIndex(p => p.id === editingProduct.id);
-        if (index >= 0) {
-          localProducts[index] = { ...localProducts[index], ...productData };
-        } else {
-          localProducts.unshift(productData);
-        }
+        // Обновляем через API
+        await api.updateProduct(editingProduct.id, productData);
         
-        // Обновляем state сразу
+        // Обновляем state
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData } : p));
       } else {
-        // Добавляем новый
-        localProducts.unshift(productData);
+        // Добавляем новый через API
+        const newProduct = await api.createProduct(productData);
         
-        // Обновляем state сразу
-        setProducts(prev => [productData, ...prev]);
-      }
-
-      saveLocalProducts(localProducts);
-
-      // Пробуем сохранить в Supabase (без ожидания результата)
-      try {
-        if (!mainImage.startsWith('data:')) {
-          // Только если изображение не base64
-          if (isEditing && editingProduct.id && !editingProduct.id.startsWith('local_')) {
-            await supabase
-              .from('products')
-              .update({
-                name: productData.name,
-                description: productData.description,
-                price: productData.price,
-                image_url: productData.image_url,
-                category_id: productData.category_id,
-                in_stock: productData.in_stock,
-                specifications: productData.specifications,
-              })
-              .eq('id', editingProduct.id);
-          }
-        }
-      } catch (e) {
-        console.log('Supabase sync skipped');
+        // Добавляем в state
+        setProducts(prev => [newProduct as Product, ...prev]);
       }
 
       showMessage('success', isEditing ? (t.admin?.productUpdated || 'Mahsulot yangilandi') : (t.admin?.productAdded || 'Mahsulot qo\'shildi'));
       closeModal();
     } catch (err) {
+      console.error('Save error:', err);
       showMessage('error', t.admin?.saveError || 'Saqlashda xatolik yuz berdi');
     } finally {
       setSaving(false);
@@ -386,31 +285,15 @@ export function AdminPage() {
     if (!confirm(t.admin?.deleteConfirm || 'Rostdan ham bu mahsulotni o\'chirmoqchimisiz?')) return;
 
     try {
-      // Добавляем в список удалённых ID
-      const deletedIds = getDeletedIds();
-      if (!deletedIds.includes(productId)) {
-        deletedIds.push(productId);
-        saveDeletedIds(deletedIds);
-      }
+      // Удаляем через API
+      await api.deleteProduct(productId);
 
-      // Удаляем из локального хранилища (если есть)
-      const localProducts = getLocalProducts().filter(p => p.id !== productId);
-      saveLocalProducts(localProducts);
-
-      // Сразу обновляем state
+      // Обновляем state
       setProducts(prev => prev.filter(p => p.id !== productId));
-
-      // Пробуем удалить из Supabase
-      if (!productId.startsWith('local_')) {
-        try {
-          await supabase.from('products').delete().eq('id', productId);
-        } catch (e) {
-          console.log('Supabase delete skipped');
-        }
-      }
 
       showMessage('success', t.admin?.productDeleted || 'Mahsulot o\'chirildi');
     } catch (err) {
+      console.error('Delete error:', err);
       showMessage('error', t.admin?.saveError || 'O\'chirishda xatolik');
     }
   };
