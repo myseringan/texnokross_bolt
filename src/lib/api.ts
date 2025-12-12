@@ -99,3 +99,52 @@ export async function deleteBanner(id: string) {
     method: 'DELETE',
   });
 }
+
+// ==================== ORDERS ====================
+
+export interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image_url: string;
+}
+
+export interface OrderCustomer {
+  name: string;
+  phone: string;
+  address?: string;
+  comment?: string;
+  deliveryType?: 'free' | 'paid';
+  deliveryCost?: number;
+}
+
+export async function createOrder(customer: OrderCustomer, items: OrderItem[], total: number) {
+  return request('/orders', {
+    method: 'POST',
+    body: JSON.stringify({ customer, items, total }),
+  });
+}
+
+export async function getOrders() {
+  return request('/orders');
+}
+
+// ==================== SETTINGS ====================
+
+export interface Settings {
+  deliveryPrice: number;
+  freeDeliveryRadius: number;
+  freeDeliveryCity: string;
+}
+
+export async function getSettings(): Promise<Settings> {
+  return request('/settings');
+}
+
+export async function updateSettings(settings: Partial<Settings>): Promise<Settings> {
+  return request('/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
