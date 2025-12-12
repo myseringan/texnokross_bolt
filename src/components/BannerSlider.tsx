@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import * as api from '../lib/api';
 
 export interface Banner {
   id: string;
@@ -12,8 +13,6 @@ export interface Banner {
   created_at: string;
 }
 
-const BANNERS_STORAGE_KEY = 'texnokross_banners';
-
 // Дефолтные баннеры
 const DEFAULT_BANNERS: Banner[] = [
   {
@@ -25,44 +24,17 @@ const DEFAULT_BANNERS: Banner[] = [
     active: true,
     created_at: new Date().toISOString(),
   },
-  {
-    id: 'banner_2',
-    title: 'Yangi kelgan mahsulotlar',
-    subtitle: '2025 yilgi eng so\'nggi modellar',
-    image_url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=400&fit=crop&auto=format',
-    type: 'new',
-    active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'banner_3',
-    title: 'Bepul yetkazib berish',
-    subtitle: 'Navoiy shahar bo\'ylab bepul yetkazib beramiz',
-    image_url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&h=400&fit=crop&auto=format',
-    type: 'delivery',
-    active: true,
-    created_at: new Date().toISOString(),
-  },
 ];
 
-// Функция загрузки баннеров
-export function loadBanners(): Banner[] {
+// Функция загрузки баннеров с API
+export async function loadBanners(): Promise<Banner[]> {
   try {
-    const stored = localStorage.getItem(BANNERS_STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
+    const banners = await api.getBanners();
+    return banners || DEFAULT_BANNERS;
   } catch (e) {
     console.error('Error loading banners:', e);
+    return DEFAULT_BANNERS;
   }
-  // Сохраняем дефолтные при первом запуске
-  localStorage.setItem(BANNERS_STORAGE_KEY, JSON.stringify(DEFAULT_BANNERS));
-  return DEFAULT_BANNERS;
-}
-
-// Функция сохранения баннеров
-export function saveBanners(banners: Banner[]) {
-  localStorage.setItem(BANNERS_STORAGE_KEY, JSON.stringify(banners));
 }
 
 interface BannerSliderProps {
@@ -78,9 +50,12 @@ export function BannerSlider({ isDark }: BannerSliderProps) {
   const touchEndX = useRef(0);
 
   useEffect(() => {
-    const allBanners = loadBanners();
-    const activeBanners = allBanners.filter(b => b.active);
-    setBanners(activeBanners);
+    const fetchBanners = async () => {
+      const allBanners = await loadBanners();
+      const activeBanners = allBanners.filter(b => b.active);
+      setBanners(activeBanners.length > 0 ? activeBanners : DEFAULT_BANNERS);
+    };
+    fetchBanners();
   }, []);
 
   // Автопрокрутка

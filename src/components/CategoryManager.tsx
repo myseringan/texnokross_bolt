@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { 
-  X, Plus, Trash2, Save, FolderOpen, Edit2, Check, AlertCircle
+  X, Plus, Trash2, Save, FolderOpen, Edit2, AlertCircle
 } from 'lucide-react';
+import * as api from '../lib/api';
 import type { Category } from '../types';
 
 interface CategoryManagerProps {
@@ -12,11 +13,10 @@ interface CategoryManagerProps {
   onCategoriesChange: (categories: Category[]) => void;
 }
 
-const LOCAL_CATEGORIES_KEY = 'texnokross_local_categories';
-
 export function CategoryManager({ isOpen, onClose, isDark, categories, onCategoriesChange }: CategoryManagerProps) {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '',
     name_ru: '',
@@ -49,7 +49,7 @@ export function CategoryManager({ isOpen, onClose, isDark, categories, onCategor
     setError(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) {
       setError('Kategoriya nomini kiriting');
       return;
@@ -66,44 +66,55 @@ export function CategoryManager({ isOpen, onClose, isDark, categories, onCategor
       return;
     }
 
-    let updatedCategories: Category[];
+    setSaving(true);
+    try {
+      if (editingCategory) {
+        // Update via API
+        const updated = await api.updateCategory(editingCategory.id, {
+          name: form.name.trim(),
+          name_ru: form.name_ru.trim() || null,
+          slug: form.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        });
 
-    if (editingCategory) {
-      // Update existing
-      updatedCategories = categories.map(c => 
-        c.id === editingCategory.id 
-          ? { 
-              ...c, 
-              name: form.name.trim(), 
-              name_ru: form.name_ru.trim() || undefined,
-              slug: form.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-            }
-          : c
-      );
-    } else {
-      // Add new
-      const newCategory: Category = {
-        id: `cat_${Date.now()}`,
-        name: form.name.trim(),
-        name_ru: form.name_ru.trim() || undefined,
-        slug: form.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-        created_at: new Date().toISOString(),
-      };
-      updatedCategories = [...categories, newCategory];
+        // Update local state
+        const updatedCategories = categories.map(c => 
+          c.id === editingCategory.id ? { ...c, ...updated } : c
+        );
+        onCategoriesChange(updatedCategories);
+      } else {
+        // Add new via API
+        const newCategory = await api.createCategory({
+          id: `cat_${Date.now()}`,
+          name: form.name.trim(),
+          name_ru: form.name_ru.trim() || null,
+          slug: form.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+          created_at: new Date().toISOString(),
+        });
+
+        onCategoriesChange([...categories, newCategory as Category]);
+      }
+
+      resetForm();
+    } catch (err) {
+      console.error('Save error:', err);
+      setError('Saqlashda xatolik');
+    } finally {
+      setSaving(false);
     }
-
-    // Save to localStorage
-    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(updatedCategories));
-    onCategoriesChange(updatedCategories);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Kategoriyani o\'chirishni xohlaysizmi?')) return;
     
-    const updatedCategories = categories.filter(c => c.id !== id);
-    localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(updatedCategories));
-    onCategoriesChange(updatedCategories);
+    try {
+      await api.deleteCategory(id);
+
+      const updatedCategories = categories.filter(c => c.id !== id);
+      onCategoriesChange(updatedCategories);
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError('O\'chirishda xatolik');
+    }
   };
 
   return (
@@ -205,6 +216,7 @@ export function CategoryManager({ isOpen, onClose, isDark, categories, onCategor
                 <div className="flex gap-3 mt-4">
                   <button
                     onClick={resetForm}
+                    disabled={saving}
                     className={`flex-1 py-2.5 rounded-xl font-medium transition-all ${
                       isDark 
                         ? 'bg-white/10 hover:bg-white/20 text-white' 
@@ -215,10 +227,11 @@ export function CategoryManager({ isOpen, onClose, isDark, categories, onCategor
                   </button>
                   <button
                     onClick={handleSave}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 rounded-xl"
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 rounded-xl disabled:opacity-50"
                   >
                     <Save className="w-4 h-4" />
-                    Saqlash
+                    {saving ? 'Saqlanmoqda...' : 'Saqlash'}
                   </button>
                 </div>
               </div>

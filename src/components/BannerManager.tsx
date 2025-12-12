@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   X, Plus, Trash2, Save, Image as ImageIcon, 
   Eye, EyeOff, GripVertical, Tag, Truck, Sparkles, Megaphone
 } from 'lucide-react';
-import { Banner, loadBanners, saveBanners } from './BannerSlider';
+import { Banner, loadBanners } from './BannerSlider';
+import * as api from '../lib/api';
 
 interface BannerManagerProps {
   isOpen: boolean;
@@ -19,9 +20,10 @@ const BANNER_TYPES = [
 ];
 
 export function BannerManager({ isOpen, onClose, isDark }: BannerManagerProps) {
-  const [banners, setBanners] = useState<Banner[]>(() => loadBanners());
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -31,6 +33,17 @@ export function BannerManager({ isOpen, onClose, isDark }: BannerManagerProps) {
     link: '',
     type: 'sale' as Banner['type'],
   });
+
+  // Загрузка баннеров
+  useEffect(() => {
+    const fetchBanners = async () => {
+      const data = await loadBanners();
+      setBanners(data);
+    };
+    if (isOpen) {
+      fetchBanners();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -70,46 +83,59 @@ export function BannerManager({ isOpen, onClose, isDark }: BannerManagerProps) {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title || !form.image_url) return;
 
-    let updatedBanners: Banner[];
-
-    if (editingBanner) {
-      // Update existing
-      updatedBanners = banners.map(b => 
-        b.id === editingBanner.id 
-          ? { ...b, ...form }
-          : b
-      );
-    } else {
-      // Add new
-      const newBanner: Banner = {
-        id: `banner_${Date.now()}`,
-        ...form,
-        active: true,
-        created_at: new Date().toISOString(),
-      };
-      updatedBanners = [newBanner, ...banners];
+    setSaving(true);
+    try {
+      if (editingBanner) {
+        // Update existing via API
+        await api.updateBanner(editingBanner.id, form);
+        setBanners(prev => prev.map(b => 
+          b.id === editingBanner.id 
+            ? { ...b, ...form }
+            : b
+        ));
+      } else {
+        // Add new via API
+        const newBanner: Banner = {
+          id: `banner_${Date.now()}`,
+          ...form,
+          active: true,
+          created_at: new Date().toISOString(),
+        };
+        await api.createBanner(newBanner);
+        setBanners(prev => [newBanner, ...prev]);
+      }
+      resetForm();
+    } catch (err) {
+      console.error('Save error:', err);
+    } finally {
+      setSaving(false);
     }
-
-    setBanners(updatedBanners);
-    saveBanners(updatedBanners);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    const updatedBanners = banners.filter(b => b.id !== id);
-    setBanners(updatedBanners);
-    saveBanners(updatedBanners);
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteBanner(id);
+      setBanners(prev => prev.filter(b => b.id !== id));
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
   };
 
-  const toggleActive = (id: string) => {
-    const updatedBanners = banners.map(b => 
-      b.id === id ? { ...b, active: !b.active } : b
-    );
-    setBanners(updatedBanners);
-    saveBanners(updatedBanners);
+  const toggleActive = async (id: string) => {
+    const banner = banners.find(b => b.id === id);
+    if (!banner) return;
+
+    try {
+      await api.updateBanner(id, { active: !banner.active });
+      setBanners(prev => prev.map(b => 
+        b.id === id ? { ...b, active: !b.active } : b
+      ));
+    } catch (err) {
+      console.error('Toggle error:', err);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
