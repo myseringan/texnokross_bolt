@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
+import * as api from '../lib/api';
 import type { Product } from '../types';
 
 const CART_STORAGE_KEY = 'texnokross_cart';
-const LOCAL_PRODUCTS_KEY = 'texnokross_local_products';
 
 interface CartItemLocal {
   id: string;
@@ -16,16 +16,6 @@ interface CartItemWithProduct {
   quantity: number;
   product: Product;
 }
-
-// Получаем локальные товары
-const getLocalProducts = (): Product[] => {
-  try {
-    const data = localStorage.getItem(LOCAL_PRODUCTS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-};
 
 // Получаем корзину из localStorage
 const getCart = (): CartItemLocal[] => {
@@ -47,47 +37,20 @@ export function useCart() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Загружаем все товары (для получения информации о товаре)
+  // Загружаем все товары
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        // Загружаем из Supabase
-        const { supabase } = await import('../lib/supabase');
-        const { data: supabaseProducts } = await supabase
-          .from('products')
-          .select('*');
-        
-        // Загружаем локальные
-        const localProducts = getLocalProducts();
-        
-        // Объединяем
-        const localIds = new Set(localProducts.map(p => p.id));
-        const merged = [
-          ...localProducts,
-          ...(supabaseProducts || []).filter(p => !localIds.has(p.id))
-        ];
-        
-        setAllProducts(merged);
-        setLoading(false);
+        const products = await api.getProducts();
+        setAllProducts(products || []);
       } catch {
-        setAllProducts(getLocalProducts());
+        setAllProducts([]);
+      } finally {
         setLoading(false);
       }
     };
 
     loadProducts();
-
-    // Обновляем список товаров каждые 2 секунды
-    const interval = setInterval(() => {
-      const localProducts = getLocalProducts();
-      setAllProducts(prev => {
-        const localIds = new Set(localProducts.map(p => p.id));
-        const nonLocal = prev.filter(p => !p.id.startsWith('local_'));
-        return [...localProducts, ...nonLocal.filter(p => !localIds.has(p.id))];
-      });
-    }, 2000);
-
-    return () => clearInterval(interval);
   }, []);
 
   // Загружаем и обновляем корзину
@@ -115,12 +78,9 @@ export function useCart() {
 
     updateCartItems();
 
-    // Проверяем изменения каждую секунду
-    const interval = setInterval(updateCartItems, 1000);
     window.addEventListener('storage', updateCartItems);
     
     return () => {
-      clearInterval(interval);
       window.removeEventListener('storage', updateCartItems);
     };
   }, [allProducts]);
@@ -130,10 +90,8 @@ export function useCart() {
     const existingIndex = cart.findIndex(item => item.productId === productId);
 
     if (existingIndex >= 0) {
-      // Увеличиваем количество
       cart[existingIndex].quantity += 1;
     } else {
-      // Добавляем новый товар
       cart.push({
         id: `cart_${Date.now()}`,
         productId: productId,
@@ -143,7 +101,6 @@ export function useCart() {
 
     saveCart(cart);
 
-    // Обновляем state
     const product = allProducts.find(p => p.id === productId);
     if (product) {
       setCartItems(prev => {
