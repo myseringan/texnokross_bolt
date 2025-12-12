@@ -83,9 +83,10 @@ export function AdminPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isBannerManagerOpen, setIsBannerManagerOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-  const [isDeliverySettingsOpen, setIsDeliverySettingsOpen] = useState(false);
-  const [deliveryPrice, setDeliveryPrice] = useState<string>('30000');
-  const [savingDelivery, setSavingDelivery] = useState(false);
+  const [isCityManagerOpen, setIsCityManagerOpen] = useState(false);
+  const [cities, setCities] = useState<{id: string; name: string; name_ru: string; price: number}[]>([]);
+  const [editingCity, setEditingCity] = useState<{id?: string; name: string; name_ru: string; price: string} | null>(null);
+  const [savingCity, setSavingCity] = useState(false);
 
   // Закрываем dropdown при клике вне его
   useEffect(() => {
@@ -117,17 +118,15 @@ export function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [productsData, categoriesData, settingsData] = await Promise.all([
+      const [productsData, categoriesData, citiesData] = await Promise.all([
         api.getProducts(),
         api.getCategories(),
-        api.getSettings(),
+        api.getCities(),
       ]);
       
       setProducts(productsData || []);
       setCategories(categoriesData?.length > 0 ? categoriesData : DEFAULT_CATEGORIES);
-      if (settingsData?.deliveryPrice) {
-        setDeliveryPrice(settingsData.deliveryPrice.toString());
-      }
+      setCities(citiesData || []);
     } catch (err) {
       console.error('Error fetching data:', err);
       setCategories(DEFAULT_CATEGORIES);
@@ -516,9 +515,9 @@ export function AdminPage() {
             <span className="hidden sm:inline">Banner</span>
           </button>
 
-          {/* Delivery Settings Button */}
+          {/* City Manager Button */}
           <button
-            onClick={() => setIsDeliverySettingsOpen(true)}
+            onClick={() => setIsCityManagerOpen(true)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
               isDark 
                 ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30' 
@@ -526,7 +525,7 @@ export function AdminPage() {
             }`}
           >
             <Truck className="w-5 h-5" />
-            <span className="hidden sm:inline">Yetkazish</span>
+            <span className="hidden sm:inline">Shaharlar</span>
           </button>
 
           {/* Add Button */}
@@ -1096,20 +1095,20 @@ export function AdminPage() {
         onCategoriesChange={setCategories}
       />
 
-      {/* Delivery Settings Modal */}
-      {isDeliverySettingsOpen && (
+      {/* City Manager Modal */}
+      {isCityManagerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
             className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-slate-900/80' : 'bg-slate-900/50'}`}
-            onClick={() => setIsDeliverySettingsOpen(false)}
+            onClick={() => { setIsCityManagerOpen(false); setEditingCity(null); }}
           />
-          <div className={`relative w-full max-w-md rounded-2xl shadow-2xl ${
+          <div className={`relative w-full max-w-lg max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col ${
             isDark 
               ? 'bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 border border-white/10' 
               : 'bg-white'
           }`}>
             {/* Header */}
-            <div className={`flex items-center justify-between p-4 border-b ${
+            <div className={`flex items-center justify-between p-4 border-b flex-shrink-0 ${
               isDark ? 'border-white/10' : 'border-gray-200'
             }`}>
               <div className="flex items-center gap-3">
@@ -1117,11 +1116,11 @@ export function AdminPage() {
                   <Truck className="w-5 h-5 text-white" />
                 </div>
                 <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Yetkazib berish narxi
+                  Shaharlar va yetkazish
                 </h2>
               </div>
               <button
-                onClick={() => setIsDeliverySettingsOpen(false)}
+                onClick={() => { setIsCityManagerOpen(false); setEditingCity(null); }}
                 className={`p-2 rounded-xl transition-all ${
                   isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'
                 }`}
@@ -1131,64 +1130,160 @@ export function AdminPage() {
             </div>
 
             {/* Content */}
-            <div className="p-4 space-y-4">
-              {/* Info */}
-              <div className={`p-3 rounded-xl text-sm ${
-                isDark ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'
-              }`}>
-                <p>🚚 Navoiy shahrida (5 km gacha) — <strong>bepul</strong></p>
-                <p className="mt-1">📍 Boshqa manzillarga yetkazish narxi:</p>
-              </div>
-
-              {/* Price Input */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${
-                  isDark ? 'text-blue-200' : 'text-gray-700'
-                }`}>
-                  Yetkazish narxi (so'm)
-                </label>
-                <div className="relative">
-                  <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
-                    isDark ? 'text-blue-400' : 'text-blue-600'
-                  }`} />
-                  <input
-                    type="number"
-                    value={deliveryPrice}
-                    onChange={(e) => setDeliveryPrice(e.target.value)}
-                    placeholder="30000"
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl border outline-none transition-all ${
-                      isDark 
-                        ? 'bg-white/10 border-white/20 text-white focus:border-blue-400' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-blue-500'
-                    }`}
-                  />
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Add/Edit City Form */}
+              {editingCity && (
+                <div className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-white/10' : 'bg-blue-50'}`}>
+                  <h3 className={`font-medium mb-3 ${isDark ? 'text-white' : 'text-blue-900'}`}>
+                    {editingCity.id ? "Shaharni tahrirlash" : "Yangi shahar qo'shish"}
+                  </h3>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={editingCity.name}
+                      onChange={(e) => setEditingCity({ ...editingCity, name: e.target.value })}
+                      placeholder="Shahar nomi (UZ)"
+                      className={`w-full px-3 py-2 rounded-lg border outline-none ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                    <input
+                      type="text"
+                      value={editingCity.name_ru}
+                      onChange={(e) => setEditingCity({ ...editingCity, name_ru: e.target.value })}
+                      placeholder="Название города (RU)"
+                      className={`w-full px-3 py-2 rounded-lg border outline-none ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                    <input
+                      type="number"
+                      value={editingCity.price}
+                      onChange={(e) => setEditingCity({ ...editingCity, price: e.target.value })}
+                      placeholder="Narxi (0 = bepul)"
+                      className={`w-full px-3 py-2 rounded-lg border outline-none ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!editingCity.name || !editingCity.name_ru) return;
+                          setSavingCity(true);
+                          try {
+                            if (editingCity.id) {
+                              await api.updateCity(editingCity.id, {
+                                name: editingCity.name,
+                                name_ru: editingCity.name_ru,
+                                price: parseInt(editingCity.price) || 0
+                              });
+                            } else {
+                              await api.createCity({
+                                name: editingCity.name,
+                                name_ru: editingCity.name_ru,
+                                price: parseInt(editingCity.price) || 0
+                              });
+                            }
+                            const citiesData = await api.getCities();
+                            setCities(citiesData);
+                            setEditingCity(null);
+                            showMessage('success', 'Saqlandi');
+                          } catch (err) {
+                            showMessage('error', 'Xatolik');
+                          } finally {
+                            setSavingCity(false);
+                          }
+                        }}
+                        disabled={savingCity}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-2 rounded-lg font-medium disabled:opacity-50"
+                      >
+                        {savingCity ? 'Saqlanmoqda...' : 'Saqlash'}
+                      </button>
+                      <button
+                        onClick={() => setEditingCity(null)}
+                        className={`px-4 py-2 rounded-lg ${
+                          isDark ? 'bg-white/10 text-white' : 'bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        Bekor
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p className={`mt-2 text-sm ${isDark ? 'text-blue-200/70' : 'text-gray-500'}`}>
-                  Joriy narx: {parseInt(deliveryPrice || '0').toLocaleString()} so'm
-                </p>
-              </div>
+              )}
+
+              {/* Cities List */}
+              {cities.map(city => (
+                <div 
+                  key={city.id}
+                  className={`p-3 rounded-xl flex items-center justify-between ${
+                    isDark ? 'bg-white/10' : 'bg-gray-50'
+                  }`}
+                >
+                  <div>
+                    <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {city.name} / {city.name_ru}
+                    </p>
+                    <p className={`text-sm ${
+                      city.price === 0 
+                        ? (isDark ? 'text-green-400' : 'text-green-600')
+                        : (isDark ? 'text-blue-300' : 'text-blue-600')
+                    }`}>
+                      {city.price === 0 ? 'Bepul' : `${city.price.toLocaleString()} so'm`}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingCity({
+                        id: city.id,
+                        name: city.name,
+                        name_ru: city.name_ru,
+                        price: city.price.toString()
+                      })}
+                      className={`p-2 rounded-lg ${
+                        isDark ? 'hover:bg-white/20' : 'hover:bg-gray-200'
+                      }`}
+                    >
+                      <Edit2 className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm('Shaharni o\'chirmoqchimisiz?')) {
+                          try {
+                            await api.deleteCity(city.id);
+                            const citiesData = await api.getCities();
+                            setCities(citiesData);
+                            showMessage('success', 'O\'chirildi');
+                          } catch (err) {
+                            showMessage('error', 'Xatolik');
+                          }
+                        }
+                      }}
+                      className={`p-2 rounded-lg ${
+                        isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-100'
+                      }`}
+                    >
+                      <Trash2 className={`w-4 h-4 ${isDark ? 'text-red-400' : 'text-red-500'}`} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Footer */}
-            <div className={`p-4 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+            <div className={`p-4 border-t flex-shrink-0 ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
               <button
-                onClick={async () => {
-                  setSavingDelivery(true);
-                  try {
-                    await api.updateSettings({ deliveryPrice: parseInt(deliveryPrice) || 30000 });
-                    showMessage('success', 'Yetkazish narxi saqlandi');
-                    setIsDeliverySettingsOpen(false);
-                  } catch (err) {
-                    showMessage('error', 'Xatolik yuz berdi');
-                  } finally {
-                    setSavingDelivery(false);
-                  }
-                }}
-                disabled={savingDelivery}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium py-3 rounded-xl shadow-lg disabled:opacity-50 transition-all"
+                onClick={() => setEditingCity({ name: '', name_ru: '', price: '0' })}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-3 rounded-xl shadow-lg transition-all"
               >
-                <Save className="w-5 h-5" />
-                {savingDelivery ? 'Saqlanmoqda...' : 'Saqlash'}
+                <Plus className="w-5 h-5" />
+                Shahar qo'shish
               </button>
             </div>
           </div>
