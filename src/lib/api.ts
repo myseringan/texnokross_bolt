@@ -117,6 +117,7 @@ export interface OrderCustomer {
   comment?: string;
   deliveryType?: 'free' | 'paid';
   deliveryCost?: number;
+  city?: string;
 }
 
 export async function createOrder(customer: OrderCustomer, items: OrderItem[], total: number) {
@@ -146,5 +147,38 @@ export async function updateSettings(settings: Partial<Settings>): Promise<Setti
   return request('/settings', {
     method: 'PUT',
     body: JSON.stringify(settings),
+  });
+}
+
+// ==================== CITIES ====================
+
+export interface City {
+  id: string;
+  name: string;
+  name_ru: string;
+  price: number;
+}
+
+export async function getCities(): Promise<City[]> {
+  return request('/cities');
+}
+
+export async function createCity(city: Omit<City, 'id'>): Promise<City> {
+  return request('/cities', {
+    method: 'POST',
+    body: JSON.stringify(city),
+  });
+}
+
+export async function updateCity(id: string, city: Partial<City>): Promise<City> {
+  return request(`/cities/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(city),
+  });
+}
+
+export async function deleteCity(id: string): Promise<void> {
+  return request(`/cities/${id}`, {
+    method: 'DELETE',
   });
 }
