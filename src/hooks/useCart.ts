@@ -151,6 +151,11 @@ export function useCart() {
     setCartItems(prev => prev.filter(item => item.id !== itemId));
   };
 
+  const clearCart = () => {
+    saveCart([]);
+    setCartItems([]);
+  };
+
   const total = cartItems.reduce(
     (sum, item) => sum + (item.product?.price || 0) * item.quantity,
     0
@@ -164,6 +169,7 @@ export function useCart() {
     addToCart,
     updateQuantity,
     removeFromCart,
+    clearCart,
     total,
     itemCount
   };
