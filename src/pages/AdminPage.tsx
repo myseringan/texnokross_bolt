@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Save, X, LogOut, Package, 
   Upload, DollarSign, FileText, Tag, Check, AlertCircle,
-  ChevronDown, Search, Grid, List, Image as ImageIcon, Megaphone, FolderOpen
+  ChevronDown, Search, Grid, List, Image as ImageIcon, Megaphone, FolderOpen, Truck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -83,6 +83,9 @@ export function AdminPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isBannerManagerOpen, setIsBannerManagerOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [isDeliverySettingsOpen, setIsDeliverySettingsOpen] = useState(false);
+  const [deliveryPrice, setDeliveryPrice] = useState<string>('30000');
+  const [savingDelivery, setSavingDelivery] = useState(false);
 
   // Закрываем dropdown при клике вне его
   useEffect(() => {
@@ -114,13 +117,17 @@ export function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [productsData, categoriesData] = await Promise.all([
+      const [productsData, categoriesData, settingsData] = await Promise.all([
         api.getProducts(),
         api.getCategories(),
+        api.getSettings(),
       ]);
       
       setProducts(productsData || []);
       setCategories(categoriesData?.length > 0 ? categoriesData : DEFAULT_CATEGORIES);
+      if (settingsData?.deliveryPrice) {
+        setDeliveryPrice(settingsData.deliveryPrice.toString());
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
       setCategories(DEFAULT_CATEGORIES);
@@ -507,6 +514,19 @@ export function AdminPage() {
           >
             <Megaphone className="w-5 h-5" />
             <span className="hidden sm:inline">Banner</span>
+          </button>
+
+          {/* Delivery Settings Button */}
+          <button
+            onClick={() => setIsDeliverySettingsOpen(true)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+              isDark 
+                ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30' 
+                : 'bg-green-100 hover:bg-green-200 text-green-700 border border-green-300'
+            }`}
+          >
+            <Truck className="w-5 h-5" />
+            <span className="hidden sm:inline">Yetkazish</span>
           </button>
 
           {/* Add Button */}
@@ -1075,6 +1095,105 @@ export function AdminPage() {
         categories={categories}
         onCategoriesChange={setCategories}
       />
+
+      {/* Delivery Settings Modal */}
+      {isDeliverySettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-slate-900/80' : 'bg-slate-900/50'}`}
+            onClick={() => setIsDeliverySettingsOpen(false)}
+          />
+          <div className={`relative w-full max-w-md rounded-2xl shadow-2xl ${
+            isDark 
+              ? 'bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 border border-white/10' 
+              : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-4 border-b ${
+              isDark ? 'border-white/10' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-br from-green-500 to-green-600 p-2 rounded-xl">
+                  <Truck className="w-5 h-5 text-white" />
+                </div>
+                <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  Yetkazib berish narxi
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsDeliverySettingsOpen(false)}
+                className={`p-2 rounded-xl transition-all ${
+                  isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+                }`}
+              >
+                <X className={`w-5 h-5 ${isDark ? 'text-white' : 'text-gray-700'}`} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {/* Info */}
+              <div className={`p-3 rounded-xl text-sm ${
+                isDark ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'
+              }`}>
+                <p>🚚 Navoiy shahrida (5 km gacha) — <strong>bepul</strong></p>
+                <p className="mt-1">📍 Boshqa manzillarga yetkazish narxi:</p>
+              </div>
+
+              {/* Price Input */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${
+                  isDark ? 'text-blue-200' : 'text-gray-700'
+                }`}>
+                  Yetkazish narxi (so'm)
+                </label>
+                <div className="relative">
+                  <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
+                    isDark ? 'text-blue-400' : 'text-blue-600'
+                  }`} />
+                  <input
+                    type="number"
+                    value={deliveryPrice}
+                    onChange={(e) => setDeliveryPrice(e.target.value)}
+                    placeholder="30000"
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl border outline-none transition-all ${
+                      isDark 
+                        ? 'bg-white/10 border-white/20 text-white focus:border-blue-400' 
+                        : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+                <p className={`mt-2 text-sm ${isDark ? 'text-blue-200/70' : 'text-gray-500'}`}>
+                  Joriy narx: {parseInt(deliveryPrice || '0').toLocaleString()} so'm
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`p-4 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+              <button
+                onClick={async () => {
+                  setSavingDelivery(true);
+                  try {
+                    await api.updateSettings({ deliveryPrice: parseInt(deliveryPrice) || 30000 });
+                    showMessage('success', 'Yetkazish narxi saqlandi');
+                    setIsDeliverySettingsOpen(false);
+                  } catch (err) {
+                    showMessage('error', 'Xatolik yuz berdi');
+                  } finally {
+                    setSavingDelivery(false);
+                  }
+                }}
+                disabled={savingDelivery}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium py-3 rounded-xl shadow-lg disabled:opacity-50 transition-all"
+              >
+                <Save className="w-5 h-5" />
+                {savingDelivery ? 'Saqlanmoqda...' : 'Saqlash'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
