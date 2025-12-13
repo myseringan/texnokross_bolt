@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Save, X, LogOut, Package, 
   Upload, DollarSign, FileText, Tag, Check, AlertCircle,
-  ChevronDown, Search, Grid, List, Image as ImageIcon, Megaphone, FolderOpen, Truck
+  ChevronDown, Search, Grid, List, Image as ImageIcon, Megaphone, FolderOpen, Truck, Database
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -87,6 +87,21 @@ export function AdminPage() {
   const [cities, setCities] = useState<{id: string; name: string; name_ru: string; price: number}[]>([]);
   const [editingCity, setEditingCity] = useState<{id?: string; name: string; name_ru: string; price: string} | null>(null);
   const [savingCity, setSavingCity] = useState(false);
+  
+  // IMPROSOFT state
+  const [isImprosoftOpen, setIsImprosoftOpen] = useState(false);
+  const [improsoftProducts, setImprosoftProducts] = useState<api.ImprosoftProduct[]>([]);
+  const [improsoftLoading, setImprosoftLoading] = useState(false);
+  const [improsoftSearch, setImprosoftSearch] = useState('');
+  const [selectedImprosoft, setSelectedImprosoft] = useState<api.ImprosoftProduct | null>(null);
+  const [improsoftForm, setImprosoftForm] = useState({
+    name_ru: '',
+    category_id: '',
+    image_url: '',
+    description: '',
+    description_ru: '',
+  });
+  const [creatingProduct, setCreatingProduct] = useState(false);
 
   // Закрываем dropdown при клике вне его
   useEffect(() => {
@@ -138,6 +153,49 @@ export function AdminPage() {
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
+  };
+
+  // Загрузка товаров из IMPROSOFT
+  const loadImprosoftProducts = async () => {
+    setImprosoftLoading(true);
+    try {
+      const data = await api.getImprosoftProducts();
+      setImprosoftProducts(data || []);
+    } catch (err) {
+      console.error('Error loading IMPROSOFT products:', err);
+      showMessage('error', 'Ошибка загрузки');
+    } finally {
+      setImprosoftLoading(false);
+    }
+  };
+
+  // Создание карточки из IMPROSOFT
+  const createFromImprosoft = async () => {
+    if (!selectedImprosoft) return;
+    
+    setCreatingProduct(true);
+    try {
+      await api.createProductFromImprosoft({
+        barcode: selectedImprosoft.barcode,
+        name: selectedImprosoft.name,
+        name_ru: improsoftForm.name_ru || selectedImprosoft.name,
+        price: selectedImprosoft.price,
+        category_id: improsoftForm.category_id,
+        image_url: improsoftForm.image_url,
+        description: improsoftForm.description,
+        description_ru: improsoftForm.description_ru,
+      });
+      
+      showMessage('success', 'Товар добавлен в каталог');
+      setSelectedImprosoft(null);
+      setImprosoftForm({ name_ru: '', category_id: '', image_url: '', description: '', description_ru: '' });
+      loadImprosoftProducts();
+      fetchData();
+    } catch (err: any) {
+      showMessage('error', err.message || 'Ошибка создания');
+    } finally {
+      setCreatingProduct(false);
+    }
   };
 
   const openAddModal = () => {
@@ -526,6 +584,19 @@ export function AdminPage() {
           >
             <Truck className="w-5 h-5" />
             <span className="hidden sm:inline">Shaharlar</span>
+          </button>
+
+          {/* IMPROSOFT Button */}
+          <button
+            onClick={() => { setIsImprosoftOpen(true); loadImprosoftProducts(); }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+              isDark 
+                ? 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30' 
+                : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300'
+            }`}
+          >
+            <Database className="w-5 h-5" />
+            <span className="hidden sm:inline">IMPROSOFT</span>
           </button>
 
           {/* Add Button */}
@@ -1285,6 +1356,254 @@ export function AdminPage() {
                 <Plus className="w-5 h-5" />
                 Shahar qo'shish
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPROSOFT Modal */}
+      {isImprosoftOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-slate-900/80' : 'bg-slate-900/50'}`}
+            onClick={() => { setIsImprosoftOpen(false); setSelectedImprosoft(null); }}
+          />
+          <div className={`relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col ${
+            isDark 
+              ? 'bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 border border-white/10' 
+              : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-4 border-b flex-shrink-0 ${
+              isDark ? 'border-white/10' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-2 rounded-xl">
+                  <Database className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    IMPROSOFT bazasi
+                  </h2>
+                  <p className={`text-sm ${isDark ? 'text-purple-300' : 'text-purple-600'}`}>
+                    {improsoftProducts.filter(p => !p.inCatalog).length} ta yangi tovar
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setIsImprosoftOpen(false); setSelectedImprosoft(null); }}
+                className={`p-2 rounded-xl transition-all ${
+                  isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+                }`}
+              >
+                <X className={`w-5 h-5 ${isDark ? 'text-white' : 'text-gray-700'}`} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-hidden flex">
+              {/* Products List */}
+              <div className={`w-1/2 flex flex-col border-r ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                {/* Search */}
+                <div className="p-3">
+                  <div className="relative">
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+                    <input
+                      type="text"
+                      value={improsoftSearch}
+                      onChange={(e) => setImprosoftSearch(e.target.value)}
+                      placeholder="Qidirish..."
+                      className={`w-full pl-9 pr-4 py-2 rounded-lg border outline-none text-sm ${
+                        isDark 
+                          ? 'bg-white/10 border-white/20 text-white placeholder-gray-400' 
+                          : 'bg-gray-50 border-gray-300 text-gray-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+                
+                {/* List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {improsoftLoading ? (
+                    <div className="flex justify-center py-10">
+                      <div className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDark ? 'border-purple-400' : 'border-purple-600'}`}></div>
+                    </div>
+                  ) : (
+                    improsoftProducts
+                      .filter(p => !p.inCatalog)
+                      .filter(p => p.name.toLowerCase().includes(improsoftSearch.toLowerCase()))
+                      .map(product => (
+                        <button
+                          key={product.id}
+                          onClick={() => {
+                            setSelectedImprosoft(product);
+                            setImprosoftForm({ name_ru: '', category_id: '', image_url: '', description: '', description_ru: '' });
+                          }}
+                          className={`w-full p-3 rounded-xl text-left transition-all ${
+                            selectedImprosoft?.id === product.id
+                              ? (isDark ? 'bg-purple-500/30 border-purple-400' : 'bg-purple-100 border-purple-400')
+                              : (isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100')
+                          } border ${isDark ? 'border-white/10' : 'border-gray-200'}`}
+                        >
+                          <p className={`font-medium text-sm truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {product.name}
+                          </p>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {product.barcode}
+                            </span>
+                            <span className={`text-sm font-medium ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                              {product.price.toLocaleString()} so'm
+                            </span>
+                          </div>
+                        </button>
+                      ))
+                  )}
+                  
+                  {!improsoftLoading && improsoftProducts.filter(p => !p.inCatalog).length === 0 && (
+                    <div className="text-center py-10">
+                      <Check className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
+                      <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Barcha tovarlar qo'shilgan
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Product Form */}
+              <div className="w-1/2 p-4 overflow-y-auto">
+                {selectedImprosoft ? (
+                  <div className="space-y-4">
+                    <div className={`p-4 rounded-xl ${isDark ? 'bg-purple-500/20' : 'bg-purple-50'}`}>
+                      <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {selectedImprosoft.name}
+                      </h3>
+                      <p className={`text-sm mt-1 ${isDark ? 'text-purple-300' : 'text-purple-600'}`}>
+                        Shtrix-kod: {selectedImprosoft.barcode}
+                      </p>
+                      <p className={`text-lg font-bold mt-2 ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                        {selectedImprosoft.price.toLocaleString()} so'm
+                      </p>
+                    </div>
+
+                    {/* Name RU */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Nomi (RU)
+                      </label>
+                      <input
+                        type="text"
+                        value={improsoftForm.name_ru}
+                        onChange={(e) => setImprosoftForm({ ...improsoftForm, name_ru: e.target.value })}
+                        placeholder={selectedImprosoft.name}
+                        className={`w-full px-3 py-2 rounded-lg border outline-none text-sm ${
+                          isDark 
+                            ? 'bg-white/10 border-white/20 text-white' 
+                            : 'bg-gray-50 border-gray-300 text-gray-900'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Kategoriya
+                      </label>
+                      <select
+                        value={improsoftForm.category_id}
+                        onChange={(e) => setImprosoftForm({ ...improsoftForm, category_id: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-lg border outline-none text-sm ${
+                          isDark 
+                            ? 'bg-white/10 border-white/20 text-white' 
+                            : 'bg-gray-50 border-gray-300 text-gray-900'
+                        }`}
+                      >
+                        <option value="">Tanlang...</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Image URL */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Rasm URL
+                      </label>
+                      <input
+                        type="text"
+                        value={improsoftForm.image_url}
+                        onChange={(e) => setImprosoftForm({ ...improsoftForm, image_url: e.target.value })}
+                        placeholder="https://..."
+                        className={`w-full px-3 py-2 rounded-lg border outline-none text-sm ${
+                          isDark 
+                            ? 'bg-white/10 border-white/20 text-white' 
+                            : 'bg-gray-50 border-gray-300 text-gray-900'
+                        }`}
+                      />
+                      {improsoftForm.image_url && (
+                        <img 
+                          src={improsoftForm.image_url} 
+                          alt="Preview" 
+                          className="mt-2 w-full h-32 object-cover rounded-lg"
+                          onError={(e) => (e.target as HTMLImageElement).style.display = 'none'}
+                        />
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Tavsif (UZ)
+                      </label>
+                      <textarea
+                        value={improsoftForm.description}
+                        onChange={(e) => setImprosoftForm({ ...improsoftForm, description: e.target.value })}
+                        rows={2}
+                        className={`w-full px-3 py-2 rounded-lg border outline-none text-sm ${
+                          isDark 
+                            ? 'bg-white/10 border-white/20 text-white' 
+                            : 'bg-gray-50 border-gray-300 text-gray-900'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Описание (RU)
+                      </label>
+                      <textarea
+                        value={improsoftForm.description_ru}
+                        onChange={(e) => setImprosoftForm({ ...improsoftForm, description_ru: e.target.value })}
+                        rows={2}
+                        className={`w-full px-3 py-2 rounded-lg border outline-none text-sm ${
+                          isDark 
+                            ? 'bg-white/10 border-white/20 text-white' 
+                            : 'bg-gray-50 border-gray-300 text-gray-900'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Create Button */}
+                    <button
+                      onClick={createFromImprosoft}
+                      disabled={creatingProduct}
+                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium py-3 rounded-xl shadow-lg disabled:opacity-50 transition-all"
+                    >
+                      <Plus className="w-5 h-5" />
+                      {creatingProduct ? "Qo'shilmoqda..." : "Katalogga qo'shish"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <Package className={`w-16 h-16 mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
+                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Chap tarafdan tovar tanlang
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
