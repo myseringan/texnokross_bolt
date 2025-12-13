@@ -182,3 +182,47 @@ export async function deleteCity(id: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+// ==================== IMPROSOFT ====================
+
+export interface ImprosoftProduct {
+  id: string;
+  name: string;
+  barcode: string;
+  price: number;
+  created_at: string;
+  updated_at?: string;
+  inCatalog: boolean;
+}
+
+export interface ImprosoftStatus {
+  total: number;
+  fromImprosoft: number;
+  rawTotal: number;
+  notAdded: number;
+  lastSync: string | null;
+}
+
+export async function getImprosoftProducts(): Promise<ImprosoftProduct[]> {
+  return request('/improsoft/products');
+}
+
+export async function getImprosoftStatus(): Promise<ImprosoftStatus> {
+  return request('/improsoft/status');
+}
+
+export async function createProductFromImprosoft(data: {
+  barcode: string;
+  name: string;
+  name_ru?: string;
+  price: number;
+  category_id?: string;
+  image_url?: string;
+  description?: string;
+  description_ru?: string;
+}): Promise<Product> {
+  return request('/improsoft/create-product', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
