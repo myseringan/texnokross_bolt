@@ -5,6 +5,7 @@ import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Header } from './components/Header';
+import { VideoIntro } from './components/VideoIntro';
 import { HomePage } from './pages/HomePage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { LoginPage } from './pages/LoginPage';
@@ -32,6 +33,10 @@ function AppContent() {
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [introComplete, setIntroComplete] = useState(false);
+
+  // Показываем интро только на главной странице при первом заходе
+  const showIntro = !sessionStorage.getItem('hasSeenIntro');
 
   if (productsLoading || cartLoading) {
     return (
@@ -57,12 +62,22 @@ function AppContent() {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
-      isDark 
-        ? 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900' 
-        : 'bg-gradient-to-br from-blue-50 via-white to-blue-100'
-    }`}>
-      <Header cartItemCount={itemCount} onCartClick={() => setIsCartOpen(true)} />
+    <>
+      {/* Video Intro - показывается только при первом заходе */}
+      {showIntro && !introComplete && (
+        <VideoIntro 
+          onComplete={() => setIntroComplete(true)} 
+          videoSrc="/intro.mp4"
+          maxDuration={20}
+        />
+      )}
+
+      <div className={`min-h-screen transition-colors duration-300 ${
+        isDark 
+          ? 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900' 
+          : 'bg-gradient-to-br from-blue-50 via-white to-blue-100'
+      }`}>
+        <Header cartItemCount={itemCount} onCartClick={() => setIsCartOpen(true)} />
 
       <Routes>
         <Route
