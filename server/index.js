@@ -560,7 +560,31 @@ app.post('/api/improsoft/create-product', (req, res) => {
     res.status(500).json({ error: 'Failed to create product' });
   }
 });
+// Создание платежа Payme
+app.post('/api/create-payment', async (req, res) => {
+  try {
+    const { order_id, amount } = req.body;
+    
+    if (!order_id || !amount) {
+      return res.status(400).json({ error: 'order_id and amount required' });
+    }
 
+    const PAYME_MERCHANT_ID = '67xxxxxxxxxxxxxxxxxx'; // ЗАМЕНИ НА СВОЙ!
+    const amountTiyin = Math.round(amount * 100);
+    
+    const params = Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${order_id};a=${amountTiyin}`).toString('base64');
+    
+    res.json({ 
+      success: true, 
+      payment_url: `https://checkout.paycom.uz/${params}`,
+      order_id,
+      amount
+    });
+  } catch (error) {
+    console.error('Create payment error:', error);
+    res.status(500).json({ error: 'Failed to create payment' });
+  }
+});
 app.listen(PORT, () => {
   console.log(`🚀 Texnokross API running on port ${PORT}`);
   console.log(`📁 Data stored in: ${DATA_DIR}`);
