@@ -21,9 +21,11 @@ export function ProductDetail({ product, isOpen, onClose, onAddToCart }: Product
   // Получаем название и описание на нужном языке
   const displayName = language === 'ru' && product.name_ru ? product.name_ru : product.name;
   const displayDescription = language === 'ru' && product.description_ru ? product.description_ru : product.description;
-  const specs = language === 'ru' && product.specifications_ru 
-    ? product.specifications_ru as Record<string, string>
-    : product.specifications as Record<string, string>;
+  
+  // ИСПРАВЛЕНО: Показываем specifications если specifications_ru пустой
+  const specsRu = product.specifications_ru as Record<string, string> || {};
+  const specsUz = product.specifications as Record<string, string> || {};
+  const specs = (language === 'ru' && Object.keys(specsRu).length > 0) ? specsRu : specsUz;
   
   // Получаем массив изображений
   const images = product.images && product.images.length > 0 
@@ -163,7 +165,7 @@ export function ProductDetail({ product, isOpen, onClose, onAddToCart }: Product
               </p>
 
               {/* Specifications */}
-              {Object.keys(specs).length > 0 && (
+              {specs && Object.keys(specs).length > 0 && (
                 <div className={`backdrop-blur-xl border rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-xl ${
                   isDark 
                     ? 'bg-white/10 border-white/20' 
