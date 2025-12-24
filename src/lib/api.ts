@@ -120,15 +120,45 @@ export interface OrderCustomer {
   city?: string;
 }
 
-export async function createOrder(customer: OrderCustomer, items: OrderItem[], total: number) {
+export interface Order {
+  id: string;
+  customer: OrderCustomer;
+  items: OrderItem[];
+  total: number;
+  status: 'pending' | 'paid' | 'cancelled' | 'delivered';
+  payment_status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled';
+  created_at: string;
+  expire_at: string;
+  paid_at?: string;
+  cancelled_at?: string;
+  transaction_id?: string;
+}
+
+export interface CreateOrderResponse {
+  success: boolean;
+  order: Order;
+}
+
+export async function createOrder(
+  customer: OrderCustomer,
+  items: OrderItem[],
+  total: number
+): Promise<CreateOrderResponse> {
   return request('/orders', {
     method: 'POST',
     body: JSON.stringify({ customer, items, total }),
   });
 }
 
-export async function getOrders() {
+export async function getOrders(): Promise<Order[]> {
   return request('/orders');
+}
+
+export async function updateOrder(id: string, data: Partial<Order>): Promise<Order> {
+  return request(`/orders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }
 
 // ==================== SETTINGS ====================
@@ -220,22 +250,72 @@ export async function createProductFromImprosoft(data: {
   image_url?: string;
   description?: string;
   description_ru?: string;
-}): Promise<Product> {
+}): Promise<any> {
   return request('/improsoft/create-product', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
+
+// ==================== PAYME PAYMENT ====================
+
 export interface PaymentResponse {
   success: boolean;
   payment_url: string;
   order_id: string;
   amount: number;
+  amount_tiyin: number;
 }
 
-export async function createPayment(orderId: string, amount: number): Promise<PaymentResponse> {
+/**
+ * Создание ссылки на оплату через Payme
+ * @param orderId - ID заказа
+ * @param amount - Сумма в сумах
+ * @param returnUrl - URL для возврата после оплаты (опционально)
+ */
+export async function createPayment(
+  orderId: string,
+  amount: number,
+  returnUrl?: string
+): Promise<PaymentResponse> {
   return request('/create-payment', {
     method: 'POST',
-    body: JSON.stringify({ order_id: orderId, amount }),
+    body: JSON.stringify({
+      order_id: orderId,
+      amount,
+      return_url: returnUrl,
+    }),
   });
+}
+
+/**
+ * Получение статуса заказа после оплаты
+ */
+export async function getOrderStatus(orderId: string): Promise<Order | null> {
+  try {
+    const orders = await getOrders();
+    return orders.find(o => o.id === orderId) || null;
+  } catch {
+    return null;
+  }
+}
+
+// ==================== TYPES ====================
+
+export interface Product {
+  id: string;
+  category_id: string | null;
+  name: string;
+  name_ru?: string;
+  description: string;
+  description_ru?: string;
+  price: number;
+  image_url: string;
+  images?: string[];
+  specifications: Record<string, string>;
+  specifications_ru?: Record<string, string>;
+  in_stock: boolean;
+  barcode?: string;
+  source?: string;
+  created_at: string;
 }
