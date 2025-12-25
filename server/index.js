@@ -25,6 +25,8 @@ const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const CITIES_FILE = path.join(DATA_DIR, 'cities.json');
 const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const RESET_CODES_FILE = path.join(DATA_DIR, 'reset_codes.json');
 
 // Telegram настройки
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -44,6 +46,29 @@ const ORDER_TIMEOUT = 12 * 60 * 60 * 1000;
 
 // Frontend URL
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://texnokross.uz';
+
+// Админ данные
+const ADMIN_PHONE = '998907174447';
+const ADMIN_PASSWORD = 'Texno@2025!';
+
+// Функции для хэширования паролей
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password + 'texnokross_salt_2025').digest('hex');
+}
+
+function verifyPassword(password, hash) {
+  return hashPassword(password) === hash;
+}
+
+// Генерация токена сессии
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Генерация кода восстановления (6 цифр)
+function generateResetCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 // Дефолтные настройки
 const DEFAULT_SETTINGS = {
@@ -512,6 +537,344 @@ app.delete('/api/banners/:id', (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// ==================== AUTH API ====================
+
+// Регистрация
+app.post('/api/auth/register', (req, res) => {
+  const { phone, password, name } = req.body;
+  
+  if (!phone || !password) {
+    return res.status(400).json({ error: 'Telefon va parol kerak' });
+  }
+  
+  // Нормализуем телефон
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-9);
+  
+  if (normalizedPhone.length < 9) {
+    return res.status(400).json({ error: 'Telefon raqami noto\'g\'ri' });
+  }
+  
+  // Проверяем если это админ номер
+  if (normalizedPhone === ADMIN_PHONE.slice(-9)) {
+    return res.status(400).json({ error: 'Bu raqam bilan ro\'yxatdan o\'tish mumkin emas' });
+  }
+  
+  const users = readJSON(USERS_FILE, []);
+  
+  // Проверяем существует ли пользователь
+  const existingUser = users.find(u => u.phone === normalizedPhone);
+  if (existingUser) {
+    return res.status(400).json({ error: 'Bu raqam allaqachon ro\'yxatdan o\'tgan' });
+  }
+  
+  // Создаём нового пользователя
+  const token = generateToken();
+  const newUser = {
+    id: `user_${Date.now()}`,
+    phone: normalizedPhone,
+    name: name || `Foydalanuvchi ${normalizedPhone.slice(-4)}`,
+    password_hash: hashPassword(password),
+    token: token,
+    isAdmin: false,
+    created_at: new Date().toISOString()
+  };
+  
+  users.push(newUser);
+  writeJSON(USERS_FILE, users);
+  
+  console.log(`👤 New user registered: ${normalizedPhone}`);
+  
+  res.json({
+    success: true,
+    user: {
+      id: newUser.id,
+      phone: newUser.phone,
+      name: newUser.name,
+      isAdmin: false,
+      token: token
+    }
+  });
+});
+
+// Вход
+app.post('/api/auth/login', (req, res) => {
+  const { phone, password } = req.body;
+  
+  if (!phone || !password) {
+    return res.status(400).json({ error: 'Telefon va parol kerak' });
+  }
+  
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-9);
+  
+  // Проверяем если это админ
+  if (normalizedPhone === ADMIN_PHONE.slice(-9)) {
+    if (password === ADMIN_PASSWORD) {
+      const token = generateToken();
+      res.json({
+        success: true,
+        user: {
+          id: 'admin',
+          phone: ADMIN_PHONE,
+          name: 'Administrator',
+          isAdmin: true,
+          token: token
+        }
+      });
+      return;
+    } else {
+      return res.status(401).json({ error: 'Parol noto\'g\'ri' });
+    }
+  }
+  
+  const users = readJSON(USERS_FILE, []);
+  const user = users.find(u => u.phone === normalizedPhone);
+  
+  if (!user) {
+    return res.status(404).json({ error: 'Foydalanuvchi topilmadi. Avval ro\'yxatdan o\'ting.' });
+  }
+  
+  if (!verifyPassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Parol noto\'g\'ri' });
+  }
+  
+  // Обновляем токен
+  const token = generateToken();
+  const userIndex = users.findIndex(u => u.phone === normalizedPhone);
+  users[userIndex].token = token;
+  users[userIndex].last_login = new Date().toISOString();
+  writeJSON(USERS_FILE, users);
+  
+  console.log(`👤 User logged in: ${normalizedPhone}`);
+  
+  res.json({
+    success: true,
+    user: {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      isAdmin: false,
+      token: token
+    }
+  });
+});
+
+// Запрос кода восстановления пароля
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { phone } = req.body;
+  
+  if (!phone) {
+    return res.status(400).json({ error: 'Telefon raqami kerak' });
+  }
+  
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-9);
+  
+  // Проверяем если это админ
+  if (normalizedPhone === ADMIN_PHONE.slice(-9)) {
+    return res.status(400).json({ error: 'Admin parolini tiklash mumkin emas' });
+  }
+  
+  const users = readJSON(USERS_FILE, []);
+  const user = users.find(u => u.phone === normalizedPhone);
+  
+  if (!user) {
+    return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+  }
+  
+  // Генерируем код
+  const code = generateResetCode();
+  const resetCodes = readJSON(RESET_CODES_FILE, []);
+  
+  // Удаляем старые коды для этого телефона
+  const filteredCodes = resetCodes.filter(c => c.phone !== normalizedPhone);
+  
+  // Добавляем новый код (действителен 10 минут)
+  filteredCodes.push({
+    phone: normalizedPhone,
+    code: code,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    created_at: new Date().toISOString()
+  });
+  
+  writeJSON(RESET_CODES_FILE, filteredCodes);
+  
+  // Отправляем SMS через Eskiz.uz (если настроен)
+  const ESKIZ_EMAIL = process.env.ESKIZ_EMAIL;
+  const ESKIZ_PASSWORD = process.env.ESKIZ_PASSWORD;
+  
+  if (ESKIZ_EMAIL && ESKIZ_PASSWORD) {
+    try {
+      // Получаем токен Eskiz
+      const tokenResponse = await fetch('https://notify.eskiz.uz/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ESKIZ_EMAIL, password: ESKIZ_PASSWORD })
+      });
+      const tokenData = await tokenResponse.json();
+      
+      if (tokenData.data?.token) {
+        // Отправляем SMS
+        const fullPhone = '998' + normalizedPhone;
+        const smsResponse = await fetch('https://notify.eskiz.uz/api/message/sms/send', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokenData.data.token}`
+          },
+          body: JSON.stringify({
+            mobile_phone: fullPhone,
+            message: `Texnokross: Parolni tiklash kodi: ${code}. Kod 10 daqiqa amal qiladi.`,
+            from: '4546'
+          })
+        });
+        const smsData = await smsResponse.json();
+        console.log(`📱 SMS sent to ${fullPhone}:`, smsData);
+      }
+    } catch (err) {
+      console.error('Eskiz SMS error:', err);
+    }
+  }
+  
+  // Также отправляем код в Telegram (как резерв)
+  if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+    const message = `🔐 Parolni tiklash kodi\n\n📞 Telefon: ${normalizedPhone}\n🔑 Kod: ${code}\n⏰ Amal qilish: 10 daqiqa`;
+    try {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: message
+        })
+      });
+    } catch (err) {
+      console.error('Telegram send error:', err);
+    }
+  }
+  
+  console.log(`🔐 Password reset code for ${normalizedPhone}: ${code}`);
+  
+  // Определяем было ли отправлено SMS
+  const smsSent = !!(ESKIZ_EMAIL && ESKIZ_PASSWORD);
+  
+  res.json({ 
+    success: true, 
+    message: smsSent ? 'SMS kod yuborildi' : 'Kod yuborildi',
+    sms_sent: smsSent,
+    // В продакшене код НЕ возвращаем! Убрать когда SMS работает:
+    debug_code: smsSent ? undefined : code
+  });
+});
+
+// Сброс пароля с кодом
+app.post('/api/auth/reset-password', (req, res) => {
+  const { phone, code, newPassword } = req.body;
+  
+  if (!phone || !code || !newPassword) {
+    return res.status(400).json({ error: 'Telefon, kod va yangi parol kerak' });
+  }
+  
+  if (newPassword.length < 4) {
+    return res.status(400).json({ error: 'Parol kamida 4 ta belgidan iborat bo\'lishi kerak' });
+  }
+  
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-9);
+  
+  const resetCodes = readJSON(RESET_CODES_FILE, []);
+  const resetEntry = resetCodes.find(c => c.phone === normalizedPhone && c.code === code);
+  
+  if (!resetEntry) {
+    return res.status(400).json({ error: 'Kod noto\'g\'ri' });
+  }
+  
+  if (new Date(resetEntry.expires_at) < new Date()) {
+    return res.status(400).json({ error: 'Kod eskirgan. Yangi kod so\'rang.' });
+  }
+  
+  // Обновляем пароль
+  const users = readJSON(USERS_FILE, []);
+  const userIndex = users.findIndex(u => u.phone === normalizedPhone);
+  
+  if (userIndex === -1) {
+    return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+  }
+  
+  users[userIndex].password_hash = hashPassword(newPassword);
+  users[userIndex].password_updated_at = new Date().toISOString();
+  writeJSON(USERS_FILE, users);
+  
+  // Удаляем использованный код
+  const filteredCodes = resetCodes.filter(c => c.phone !== normalizedPhone);
+  writeJSON(RESET_CODES_FILE, filteredCodes);
+  
+  console.log(`🔐 Password reset for ${normalizedPhone}`);
+  
+  res.json({ success: true, message: 'Parol muvaffaqiyatli o\'zgartirildi' });
+});
+
+// Смена пароля (для авторизованного пользователя)
+app.post('/api/auth/change-password', (req, res) => {
+  const { phone, oldPassword, newPassword } = req.body;
+  
+  if (!phone || !oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'Barcha maydonlarni to\'ldiring' });
+  }
+  
+  if (newPassword.length < 4) {
+    return res.status(400).json({ error: 'Yangi parol kamida 4 ta belgidan iborat bo\'lishi kerak' });
+  }
+  
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-9);
+  
+  const users = readJSON(USERS_FILE, []);
+  const userIndex = users.findIndex(u => u.phone === normalizedPhone);
+  
+  if (userIndex === -1) {
+    return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+  }
+  
+  if (!verifyPassword(oldPassword, users[userIndex].password_hash)) {
+    return res.status(401).json({ error: 'Joriy parol noto\'g\'ri' });
+  }
+  
+  users[userIndex].password_hash = hashPassword(newPassword);
+  users[userIndex].password_updated_at = new Date().toISOString();
+  writeJSON(USERS_FILE, users);
+  
+  console.log(`🔐 Password changed for ${normalizedPhone}`);
+  
+  res.json({ success: true, message: 'Parol muvaffaqiyatli o\'zgartirildi' });
+});
+
+// Получение профиля пользователя
+app.get('/api/auth/profile/:phone', (req, res) => {
+  const normalizedPhone = req.params.phone.replace(/\D/g, '').slice(-9);
+  
+  // Проверяем если это админ
+  if (normalizedPhone === ADMIN_PHONE.slice(-9)) {
+    return res.json({
+      id: 'admin',
+      phone: ADMIN_PHONE,
+      name: 'Administrator',
+      isAdmin: true
+    });
+  }
+  
+  const users = readJSON(USERS_FILE, []);
+  const user = users.find(u => u.phone === normalizedPhone);
+  
+  if (!user) {
+    return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+  }
+  
+  res.json({
+    id: user.id,
+    phone: user.phone,
+    name: user.name,
+    isAdmin: false,
+    created_at: user.created_at
+  });
 });
 
 // ==================== ORDERS ====================
