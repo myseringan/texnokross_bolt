@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 interface User {
   id: string;
   phone: string;
   name: string;
   isAdmin: boolean;
+  token?: string;
 }
 
 interface AuthContextType {
@@ -12,18 +15,16 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (phone: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  forgotPassword: (phone: string) => Promise<{ success: boolean; error?: string; code?: string }>;
+  resetPassword: (phone: string, code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Админ номер телефона
-const ADMIN_PHONE = '998907174447';
-const ADMIN_PASSWORD = 'Texno@2025!';
-
-// Хранение пользователей в localStorage
-const USERS_STORAGE_KEY = 'texnokross_users';
 const AUTH_STORAGE_KEY = 'texnokross_auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,89 +45,130 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const getUsers = (): Record<string, { password: string; name: string }> => {
+  const register = async (phone: string, password: string, name?: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const users = localStorage.getItem(USERS_STORAGE_KEY);
-      return users ? JSON.parse(users) : {};
-    } catch {
-      return {};
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password, name })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Ro\'yxatdan o\'tishda xatolik' };
+      }
+      
+      setUser(data.user);
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+      return { success: true };
+    } catch (err) {
+      console.error('Register error:', err);
+      return { success: false, error: 'Server bilan bog\'lanishda xatolik' };
     }
-  };
-
-  const saveUsers = (users: Record<string, { password: string; name: string }>) => {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
   };
 
   const login = async (phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Нормализуем номер телефона
-    const normalizedPhone = phone.replace(/\D/g, '');
-    
-    if (normalizedPhone.length < 9) {
-      return { success: false, error: 'Telefon raqami noto\'g\'ri' };
-    }
-
-    // Проверяем если это админ номер
-    const isAdminPhone = normalizedPhone === ADMIN_PHONE || 
-                         normalizedPhone === '907174447' ||
-                         normalizedPhone.endsWith('907174447');
-
-    if (isAdminPhone) {
-      // Проверяем пароль админа
-      if (password === ADMIN_PASSWORD) {
-        const adminUser: User = {
-          id: 'admin',
-          phone: ADMIN_PHONE,
-          name: 'Administrator',
-          isAdmin: true,
-        };
-        setUser(adminUser);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(adminUser));
-        return { success: true };
-      } else {
-        return { success: false, error: 'Parol noto\'g\'ri' };
-      }
-    }
-
-    // Обычный пользователь
-    const users = getUsers();
-    
-    if (users[normalizedPhone]) {
-      if (users[normalizedPhone].password === password) {
-        const loggedUser: User = {
-          id: normalizedPhone,
-          phone: normalizedPhone,
-          name: users[normalizedPhone].name,
-          isAdmin: false,
-        };
-        setUser(loggedUser);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(loggedUser));
-        return { success: true };
-      } else {
-        return { success: false, error: 'Parol noto\'g\'ri' };
-      }
-    } else {
-      // Регистрируем нового пользователя
-      users[normalizedPhone] = {
-        password,
-        name: `Foydalanuvchi ${normalizedPhone.slice(-4)}`,
-      };
-      saveUsers(users);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password })
+      });
       
-      const newUser: User = {
-        id: normalizedPhone,
-        phone: normalizedPhone,
-        name: users[normalizedPhone].name,
-        isAdmin: false,
-      };
-      setUser(newUser);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // Если пользователь не найден, пробуем зарегистрировать
+        if (response.status === 404) {
+          return await register(phone, password);
+        }
+        return { success: false, error: data.error || 'Kirishda xatolik' };
+      }
+      
+      setUser(data.user);
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
       return { success: true };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, error: 'Server bilan bog\'lanishda xatolik' };
     }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+  };
+
+  const forgotPassword = async (phone: string): Promise<{ success: boolean; error?: string; code?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Xatolik yuz berdi' };
+      }
+      
+      return { success: true, code: data.debug_code };
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      return { success: false, error: 'Server bilan bog\'lanishda xatolik' };
+    }
+  };
+
+  const resetPassword = async (phone: string, code: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, code, newPassword })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Xatolik yuz berdi' };
+      }
+      
+      return { success: true };
+    } catch (err) {
+      console.error('Reset password error:', err);
+      return { success: false, error: 'Server bilan bog\'lanishda xatolik' };
+    }
+  };
+
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Foydalanuvchi topilmadi' };
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          phone: user.phone, 
+          oldPassword, 
+          newPassword 
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Xatolik yuz berdi' };
+      }
+      
+      return { success: true };
+    } catch (err) {
+      console.error('Change password error:', err);
+      return { success: false, error: 'Server bilan bog\'lanishda xatolik' };
+    }
   };
 
   return (
@@ -136,7 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isAdmin: user?.isAdmin || false,
         login,
+        register,
         logout,
+        forgotPassword,
+        resetPassword,
+        changePassword,
         loading,
       }}
     >
