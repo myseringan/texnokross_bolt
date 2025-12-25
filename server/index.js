@@ -112,11 +112,14 @@ function writeJSON(file, data) {
 // ==================== TELEGRAM BOT ====================
 
 // Отправка сообщения с кнопками
-async function sendTelegramWithButtons(message, orderId) {
+async function sendTelegramWithButtons(message, orderId, shortId) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.log('Telegram not configured, skipping notification');
     return false;
   }
+  
+  // Используем short_id для callback_data (лимит 64 байта в Telegram)
+  const cbId = shortId || orderId.slice(-6);
   
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -124,12 +127,12 @@ async function sendTelegramWithButtons(message, orderId) {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: '📦 Обрабатывается', callback_data: `status_processing_${orderId}` },
-          { text: '🚚 Отправлено', callback_data: `status_shipped_${orderId}` }
+          { text: '📦 Обрабатывается', callback_data: `st_proc_${cbId}` },
+          { text: '🚚 Отправлено', callback_data: `st_ship_${cbId}` }
         ],
         [
-          { text: '✅ Доставлено', callback_data: `status_delivered_${orderId}` },
-          { text: '❌ Отменить', callback_data: `status_cancelled_${orderId}` }
+          { text: '✅ Доставлено', callback_data: `st_done_${cbId}` },
+          { text: '❌ Отменить', callback_data: `st_canc_${cbId}` }
         ]
       ]
     };
@@ -152,7 +155,7 @@ async function sendTelegramWithButtons(message, orderId) {
 }
 
 // Обновление сообщения
-async function updateTelegramMessage(chatId, messageId, newText, orderId, showButtons = true) {
+async function updateTelegramMessage(chatId, messageId, newText, shortId, showButtons = true) {
   if (!TELEGRAM_BOT_TOKEN) return false;
   
   try {
@@ -169,12 +172,12 @@ async function updateTelegramMessage(chatId, messageId, newText, orderId, showBu
       body.reply_markup = {
         inline_keyboard: [
           [
-            { text: '📦 Обрабатывается', callback_data: `status_processing_${orderId}` },
-            { text: '🚚 Отправлено', callback_data: `status_shipped_${orderId}` }
+            { text: '📦 Обрабатывается', callback_data: `st_proc_${shortId}` },
+            { text: '🚚 Отправлено', callback_data: `st_ship_${shortId}` }
           ],
           [
-            { text: '✅ Доставлено', callback_data: `status_delivered_${orderId}` },
-            { text: '❌ Отменить', callback_data: `status_cancelled_${orderId}` }
+            { text: '✅ Доставлено', callback_data: `st_done_${shortId}` },
+            { text: '❌ Отменить', callback_data: `st_canc_${shortId}` }
           ]
         ]
       };
@@ -224,16 +227,35 @@ app.post('/api/telegram/webhook', async (req, res) => {
       const messageId = update.callback_query.message.message_id;
       const callbackQueryId = update.callback_query.id;
       
-      // Парсим callback: status_STATUS_ORDERID
-      const match = callbackData.match(/^status_(\w+)_(.+)$/);
+      console.log('Callback received:', callbackData);
+      
+      // Парсим callback: st_STATUS_SHORTID (новый формат)
+      const match = callbackData.match(/^st_(proc|ship|done|canc)_(\d+)$/);
       
       if (match) {
-        const newStatus = match[1];
-        const orderId = match[2];
+        const statusCode = match[1];
+        const shortId = match[2];
+        
+        // Маппинг коротких кодов в полные статусы
+        const statusMap = {
+          'proc': 'processing',
+          'ship': 'shipped',
+          'done': 'delivered',
+          'canc': 'cancelled'
+        };
+        const newStatus = statusMap[statusCode];
+        
+        console.log('Webhook received - Status:', newStatus, 'ShortID:', shortId);
         
         // Обновляем статус заказа
         const orders = readJSON(ORDERS_FILE, []);
-        const orderIndex = orders.findIndex(o => o.id === orderId);
+        
+        // Ищем по short_id или по последним 6 символам id
+        const orderIndex = orders.findIndex(o => 
+          o.short_id === shortId || o.id.endsWith(shortId)
+        );
+        
+        console.log('Found order index:', orderIndex);
         
         if (orderIndex !== -1) {
           const order = orders[orderIndex];
@@ -272,7 +294,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
             : `🚚 Доставка: ${order.customer.deliveryCost?.toLocaleString() || 0} сум`;
           
           const updatedMessage = `
-✅ <b>Заказ #${order.id.slice(-6)}</b>
+✅ <b>Заказ #${order.short_id || order.id.slice(-6)}</b>
 
 👤 Клиент: ${order.customer.name}
 📞 Телефон: ${order.customer.phone}
@@ -291,12 +313,52 @@ ${itemsList}
           
           // Обновляем сообщение
           const showButtons = newStatus !== 'delivered' && newStatus !== 'cancelled';
-          await updateTelegramMessage(chatId, messageId, updatedMessage, orderId, showButtons);
+          const cbShortId = order.short_id || order.id.slice(-6);
+          await updateTelegramMessage(chatId, messageId, updatedMessage, cbShortId, showButtons);
           
           // Отвечаем на callback
           await answerCallback(callbackQueryId, `Статус изменён: ${statusLabel}`);
         } else {
-          await answerCallback(callbackQueryId, 'Заказ не найден');
+          console.log('ORDER NOT FOUND! ShortID from callback:', shortId);
+          console.log('All order IDs in database:', orders.map(o => `${o.id} (short: ${o.short_id})`).join(', '));
+          await answerCallback(callbackQueryId, `Заказ не найден: #${shortId}`);
+        }
+      } else {
+        // Пробуем старый формат для существующих заказов
+        const oldMatch = callbackData.match(/^status_(\w+)_(.+)$/);
+        if (oldMatch) {
+          const newStatus = oldMatch[1];
+          const orderId = oldMatch[2];
+          
+          console.log('Old format callback - Status:', newStatus, 'OrderID:', orderId);
+          
+          const orders = readJSON(ORDERS_FILE, []);
+          const orderIndex = orders.findIndex(o => o.id === orderId);
+          
+          if (orderIndex !== -1) {
+            const order = orders[orderIndex];
+            orders[orderIndex].status = newStatus;
+            
+            const now = new Date().toISOString();
+            if (newStatus === 'processing') orders[orderIndex].processing_at = now;
+            if (newStatus === 'shipped') orders[orderIndex].shipped_at = now;
+            if (newStatus === 'delivered') orders[orderIndex].delivered_at = now;
+            if (newStatus === 'cancelled') orders[orderIndex].cancelled_at = now;
+            
+            writeJSON(ORDERS_FILE, orders);
+            
+            const statusLabels = {
+              'processing': '📦 Обрабатывается',
+              'shipped': '🚚 Отправлено',
+              'delivered': '✅ Доставлено',
+              'cancelled': '❌ Отменён'
+            };
+            const statusLabel = statusLabels[newStatus] || newStatus;
+            
+            await answerCallback(callbackQueryId, `Статус изменён: ${statusLabel}`);
+          } else {
+            await answerCallback(callbackQueryId, `Заказ не найден`);
+          }
         }
       }
     }
@@ -474,8 +536,12 @@ app.post('/api/orders', async (req, res) => {
   const orders = readJSON(ORDERS_FILE, []);
   const { customer, items, total } = req.body;
   
+  // Генерируем короткий ID из 6 цифр
+  const shortId = Math.floor(100000 + Math.random() * 900000).toString();
+  
   const newOrder = {
-    id: `order_${Date.now()}`,
+    id: `order_${Date.now()}_${shortId}`,
+    short_id: shortId,
     customer,
     items,
     total,
@@ -1016,7 +1082,7 @@ async function performTransaction(params) {
     const telegramMessage = `
 ✅ <b>Оплата получена!</b>
 
-🛒 Заказ: #${order.id.slice(-6)}
+🛒 Заказ: #${order.short_id || order.id.slice(-6)}
 👤 Клиент: ${order.customer.name}
 📞 Телефон: ${order.customer.phone}
 🏙 Город: ${order.customer.city || 'Не указан'}
@@ -1032,7 +1098,7 @@ ${itemsList}
 🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent' })}
     `.trim();
     
-    await sendTelegramWithButtons(telegramMessage, order.id);
+    await sendTelegramWithButtons(telegramMessage, order.id, order.short_id);
   }
   
   console.log(`✅ Transaction performed: ${transaction.id}`);
