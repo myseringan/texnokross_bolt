@@ -1275,7 +1275,7 @@ function createPaymeError(code, message, data = null) {
     '-32600': { ru: 'Неверный JSON-RPC объект', uz: 'Noto\'g\'ri JSON-RPC obyekt', en: 'Invalid JSON-RPC object' },
     '-32601': { ru: 'Метод не найден', uz: 'Metod topilmadi', en: 'Method not found' },
     '-31050': { ru: 'Заказ не найден', uz: 'Buyurtma topilmadi', en: 'Order not found' },
-    '-31051': { ru: 'Неверная сумма', uz: 'Noto\'g\'ri summa', en: 'Invalid amount' },
+    '-31001': { ru: 'Неверная сумма', uz: 'Noto\'g\'ri summa', en: 'Invalid amount' },
     '-31052': { ru: 'Заказ просрочен', uz: 'Buyurtma muddati o\'tgan', en: 'Order expired' },
     '-31053': { ru: 'Заказ уже оплачен', uz: 'Buyurtma allaqachon to\'langan', en: 'Order already paid' },
     '-31060': { ru: 'Невозможно отменить транзакцию', uz: 'Tranzaksiyani bekor qilib bo\'lmaydi', en: 'Cannot cancel transaction' },
@@ -1308,7 +1308,7 @@ async function checkPerformTransaction(params) {
   
   const expectedAmount = order.total * 100;
   if (amount !== expectedAmount) {
-    return createPaymeError(-31051, 'Invalid amount', 'amount');
+    return createPaymeError(-31001, 'Invalid amount', 'amount');
   }
   
   if (new Date() > new Date(order.expire_at)) {
